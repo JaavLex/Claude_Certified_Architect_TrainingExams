@@ -113,7 +113,7 @@ On macOS you can also remove the warning for a downloaded copy with `xattr -d co
 - ☑️ **Exam-style answers**: each question says how many to pick ("Select 1", "Select 2") and you must pick exactly that many.
 - 🧭 **Navigator**: see which questions are answered, incomplete, flagged or unanswered; flag questions and jump to any of them.
 - 🎯 **Official-style scoring**: PASS/FAIL, scaled score 100–1,000, pass at 720, percent correct per domain, and readiness advice.
-- 📊 **Grading insights**: points lost per domain, the domain to focus on next, and a score estimate weighted like the real exam's domain mix.
+- 📊 **Graded like the real exam**: each domain counts at its share of the real exam, with the points each domain cost you and the domain to focus on next.
 - 🏃 **Pacing coach**: an on-pace indicator, a timer for each question, and a "guess, flag, move on" prompt when one takes over 3 minutes.
 - 🔍 **Full review**: every question with your answer, the correct answer and the explanation. Filter to only the ones you got wrong.
 - 💪 **Train weaknesses**: practise the questions you miss most often, with instant feedback, until you get each right twice in a row.
@@ -130,15 +130,24 @@ Scoring follows the CCAR-F Exam Guide, section 10, "How the Exam Is Scored":
 | Items | 60 |
 | Time limit | 120 minutes; submits automatically at zero |
 | Item scoring | 1 point per item. "Select 2" items score only when both choices are correct (no partial credit) |
+| Domain weighting | Each domain counts at its share of the real exam (Exam Guide §4): D1 27%, D2 18%, D3 20%, D4 20%, D5 15% |
 | Unanswered | Counts as incorrect; wrong answers lose nothing extra, so always answer |
 | Scaled score | 100–1,000 |
 | Pass mark | **720** |
-| Report | Pass/fail, scaled score, and percent correct per domain (the domain figures do not affect pass/fail) |
+| Report | Pass/fail, scaled score, raw count, and percent correct per domain |
+
+**Why weighting?** The Exam Guide says the domain weights are "the approximate proportion of scored items drawn from each domain". The practice exams don't follow that mix: Practice Exam #1 has only 5 D2 questions against about 11 on the real exam, and 15 D4 questions against about 12. A plain count would make a weak D2 almost invisible, so each domain's percent correct is weighted by its real-exam share:
+
+```
+weighted % = Σ (domain weight × domain % correct) / Σ weights      scaled = 100 + 900 × weighted %
+```
+
+For example, 54/60 correct with 15/16 · 4/5 · 6/9 · 15/15 · 13/14 across D1–D5 is 27×93.8% + 18×80% + 20×66.7% + 20×100% + 15×92.9% = **87.0% → 883**. Questions outside the five domains (the "Misc" scope question) don't count. Passing takes **68.9% weighted**. Results still show the raw count (54/60).
 
 > [!NOTE]
-> The official conversion from correct answers to the 100–1,000 scale is not published. This app uses a straight-line conversion, `scaled = 100 + 900 × correct / items`, so passing a 60-item exam takes **42 of 60 correct (70%)**.
+> The official conversion from percent to the 100–1,000 scale is not published, so the app uses the straight-line mapping above. Attempts saved by earlier versions are re-graded from their saved answers when the app starts.
 
-A question tagged with two domains (e.g. `D4/1`) counts under the first one. Custom exams are scored with the same rules; only the number of items and the time limit can differ.
+A question tagged with two domains (e.g. `D4/1`) counts under the first one. Custom exams are graded the same way when their domains have a `weight`. Without weights, every question counts the same (`scaled = 100 + 900 × correct / items`, so 42 of 60 to pass).
 
 ### What the results also show
 
@@ -146,8 +155,8 @@ These come from the Exam Guide and the study guide that comes with these practic
 
 | On screen | Where it comes from | What it tells you |
 |---|---|---|
-| **Estimate** ≈ score, would pass / would not pass | Exam Guide §4: domain weights (D1 27%, D2 18%, D3 20%, D4 20%, D5 15%) are "the approximate proportion of scored items drawn from each domain" | Your percent correct per domain, weighted as on the real exam. The practice exams' own mix differs (Practice Exam #1 has only 5 D2 questions, against about 11 on the real exam), so this is a better guess at your real result than the raw score. |
-| **−pts** per domain and **Focus next** | Study plan: "a single weak domain can sink you" | How many scaled points each domain cost you (each question is worth 15 points on a 60-item exam), and which domain to study first. |
+| **Weight** column and **Weighting** line | Exam Guide §4 domain weights | Each domain's share of your score, and your weighted percent. |
+| **−pts** per domain and **Focus next** | Study plan: "a single weak domain can sink you" | How many scaled points each domain cost you (its share of the 900-point range × the part you missed), and which domain to study first. |
 | **Attempt #1 · first attempt** | Study plan §6 and the pre-exam checklist: "≥85% on both practice exams on first full attempt, timed"; ≥90% means exam-ready | Whether this attempt counts toward readiness. Retakes score higher because you've seen the questions. |
 | **Pace** per question, and questions over 3:00 | Study plan, test-day tactics: "2 min/question. If a question eats 3 min, guess + flag, move on" | Whether you'd finish in time, and which questions slowed you down. The review screen shows the time spent on each question. |
 
@@ -248,7 +257,7 @@ Custom exams are marked with ✦ in the menu. To remove one, press `o`, delete i
 | `title` | yes | Full title. The part before ` — ` is the short name in menus. |
 | `description` | no | Text shown in the menu's Details panel. |
 | `time_limit_minutes` | no | Time limit. Default: 120. |
-| `domains` | no | `id`/`name` pairs for the per-domain breakdown, in display order. Add `weight` (a percent, e.g. `27`) to each to get the weighted **Estimate** in the results. |
+| `domains` | no | `id`/`name` pairs for the per-domain breakdown, in display order. Add `weight` (a percent, e.g. `27`) to grade each domain at that share of the score; domains without a weight then don't count. |
 | `questions` | yes | At least one question. |
 
 **Question**

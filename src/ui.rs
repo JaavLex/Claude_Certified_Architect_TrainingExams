@@ -356,7 +356,7 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
 
 fn draw_intro(f: &mut Frame, area: Rect, app: &App, exam: usize) {
     let e = &app.exams[exam];
-    let box_ = centered(area, 76, 19);
+    let box_ = centered(area, 76, 20);
     let rule = |k: &str, v: &str| {
         Line::from(vec![Span::styled(format!("{k:<14}"), Style::new().fg(DIM)), Span::raw(v.to_string())])
     };
@@ -369,6 +369,14 @@ fn draw_intro(f: &mut Frame, area: Rect, app: &App, exam: usize) {
         rule("Multi-select", "Select EXACTLY the stated number; no partial credit"),
         rule("Unanswered", "Scored as incorrect — no penalty for guessing"),
         rule("Report", "Pass/fail, scaled score, percent-correct by domain"),
+        rule(
+            "Weighting",
+            if e.domains.iter().any(|d| d.weight.is_some()) {
+                "Domains count at their share of the real exam (D1 27%…)"
+            } else {
+                "Every question counts the same"
+            },
+        ),
         rule("Pace", &{
             let per = e.time_limit_secs() / e.questions.len().max(1) as u64;
             format!("{} per question; past {} guess, flag, move on", fmt_ms(per), fmt_ms(per * 3 / 2))
@@ -710,7 +718,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
 
     let [_, content, foot] =
         Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1)]).areas(area);
-    let content = centered(content, 96, content.height);
+    let content = centered(content, 104, content.height);
     let [hero, scale, domains] =
         Layout::vertical([Constraint::Length(12), Constraint::Length(5), Constraint::Fill(1)]).areas(content);
 
@@ -729,7 +737,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         Line::from(vec![
             Span::styled("Attempt   ", Style::new().fg(DIM)),
             Span::raw("#1 · first attempt "),
-            if r.pct() >= score::FIRST_ATTEMPT_TARGET {
+            if r.score_pct() >= score::FIRST_ATTEMPT_TARGET {
                 Span::styled(format!("✓ meets the ≥{:.0}% target", score::FIRST_ATTEMPT_TARGET), Style::new().fg(GOOD))
             } else {
                 Span::styled(format!("· study-plan target ≥{:.0}%", score::FIRST_ATTEMPT_TARGET), Style::new().fg(WARN))
@@ -764,7 +772,12 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         ]),
         Line::from(vec![
             Span::styled(format!("{shown_correct}/{}", r.total), Style::new().bold()),
-            Span::styled(format!(" correct ({:.1}%)", r.pct() * t), Style::new().fg(DIM)),
+            Span::styled(format!(" correct ({:.1}% raw)", r.pct() * t), Style::new().fg(DIM)),
+            if r.is_weighted() {
+                Span::styled(format!(" · {:.1}% weighted", r.score_pct() * t), Style::new().fg(color))
+            } else {
+                Span::raw("")
+            },
             Span::styled(format!("   cut score {CUT_SCORE}"), Style::new().fg(DIM)),
         ]),
         Line::raw(""),
@@ -785,7 +798,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         ]),
         Line::from(vec![
             Span::styled("Readiness ", Style::new().fg(DIM)),
-            Span::styled(score::readiness(r.pct()).to_string(), Style::new().italic()),
+            Span::styled(score::readiness(r.score_pct()).to_string(), Style::new().italic()),
         ]),
     ];
     if let Some(p) = pace_line {
@@ -802,13 +815,18 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
 
     // Per-domain table
     let prev = app.previous_attempt(idx);
-    let bar_w = (domains.width as usize).saturating_sub(80).clamp(8, 30);
+    let bar_w = (domains.width as usize).saturating_sub(84).clamp(8, 30);
     let lost: std::collections::HashMap<String, f64> = r.points_lost().into_iter().collect();
     let mut lines = vec![Line::raw("")];
     for d in r.domains.iter().filter(|d| d.total > 0) {
         let mut spans = vec![
             Span::styled(format!("{:<5}", d.domain), Style::new().fg(ACCENT).bold()),
-            Span::raw(format!("{:<40}", truncate(&domain_name(app, a, &d.domain), 39))),
+            Span::raw(format!("{:<39}", truncate(&domain_name(app, a, &d.domain), 38))),
+            match r.weight_of(&d.domain) {
+                Some(w) => Span::styled(format!("{w:>3.0}% "), Style::new().fg(DIM)),
+                None if r.is_weighted() => Span::styled("  —  ", Style::new().fg(DIM)),
+                None => Span::raw("     "),
+            },
             Span::styled(format!("{:>2}/{:<2} ", d.correct, d.total), Style::new().fg(DIM)),
         ];
         spans.extend(mini_bar(d.pct() * t, bar_w));
@@ -834,17 +852,23 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
             Span::styled(format!("  cost you {l:.0} scaled points"), Style::new().fg(BAD)),
         ]));
     }
-    let exam = app.exam_index(&a.exam_id).map(|e| &app.exams[e]);
-    if let Some(w) = exam.and_then(|e| score::weighted_estimate(e, r)) {
+    if r.is_weighted() {
         lines.push(Line::from(vec![
-            Span::styled("Estimate    ", Style::new().fg(DIM)),
-            Span::styled(format!("≈ {} ", w.scaled), Style::new().fg(if w.passed { GOOD } else { BAD }).bold()),
-            Span::styled(format!("({:.1}%) ", w.pct), Style::new().fg(DIM)),
-            if w.passed { Span::styled("would pass", Style::new().fg(GOOD)) } else { Span::styled("would not pass", Style::new().fg(BAD)) },
-            Span::styled(" with domains weighted as on the real exam", Style::new().fg(DIM)),
+            Span::styled("Weighting   ", Style::new().fg(DIM)),
+            Span::raw(format!("{:.1}% ", r.score_pct())),
+            Span::styled("= each domain counted at its share of the real exam (Exam Guide §4)", Style::new().fg(DIM)),
         ]));
-        if w.coverage < 99.5 {
-            lines.push(Line::from(format!("            (only {:.0}% of the blueprint is covered by this exam's domains)", w.coverage)).fg(DIM));
+        let unscored: Vec<&str> = r
+            .domains
+            .iter()
+            .filter(|d| d.total > 0 && r.weight_of(&d.domain).is_none())
+            .map(|d| d.domain.as_str())
+            .collect();
+        if !unscored.is_empty() {
+            lines.push(
+                Line::from(format!("            {} is outside the blueprint and does not count toward the score", unscored.join(", ")))
+                    .fg(DIM),
+            );
         }
     }
     lines.push(Line::raw(""));
@@ -861,7 +885,13 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
     };
     lines.push(note);
     lines.push(
-        Line::from("Domain percentages are diagnostic only; pass/fail uses the total scaled score.").fg(DIM).italic(),
+        Line::from(if r.is_weighted() {
+            "Pass/fail uses the scaled score: 720 needs 68.9% weighted."
+        } else {
+            "Domain percentages are diagnostic only; pass/fail uses the total scaled score."
+        })
+        .fg(DIM)
+        .italic(),
     );
     if let Some(err) = &app.save_error {
         lines.push(Line::from(format!("⚠ could not save attempt: {err}")).fg(BAD));
@@ -1145,7 +1175,7 @@ fn draw_history(f: &mut Frame, area: Rect, app: &App, cursor: usize, filter: Opt
                 Cell::from(title.replace("Practice Exam ", "Exam ")),
                 Cell::from(format!("{}", r.scaled)).fg(if r.passed { GOOD } else { BAD }).bold(),
                 Cell::from(format!("{}/{}", r.correct, r.total)),
-                Cell::from(format!("{:.1}%", r.pct())),
+                Cell::from(format!("{:.1}%", r.score_pct())),
                 if r.passed { Cell::from("PASS").fg(GOOD).bold() } else { Cell::from("FAIL").fg(BAD).bold() },
                 Cell::from(fmt_hms(a.duration_secs) + if a.timed_out { " ⏱" } else { "" }),
                 delta_cell,

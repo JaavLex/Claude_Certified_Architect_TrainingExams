@@ -275,7 +275,7 @@ impl App {
     pub fn new(extra_paths: Vec<PathBuf>) -> Self {
         let exam_dir_error = exam::ensure_user_exam_dir().err();
         let loaded = exam::load_all(&extra_paths);
-        App {
+        let mut app = App {
             exams: loaded.exams,
             attempts: store::load(),
             practice: store::load_practice(),
@@ -286,6 +286,29 @@ impl App {
             load_errors: loaded.errors,
             exam_dir_error,
             extra_paths,
+        };
+        app.regrade();
+        app
+    }
+
+    /// Re-score saved attempts from their answers with the current exams, so
+    /// history always reflects the current grading rules and answer keys
+    /// (e.g. attempts saved before domain weighting was introduced).
+    fn regrade(&mut self) {
+        let mut changed = false;
+        for a in &mut self.attempts {
+            let Some(e) = self.exams.iter().find(|e| e.id == a.exam_id) else { continue };
+            if e.questions.len() != a.answers.len() {
+                continue; // The exam file changed shape; keep the score it was given.
+            }
+            let fresh = score::score(e, &a.answers);
+            if fresh.scaled != a.report.scaled || fresh.correct != a.report.correct || fresh.weights != a.report.weights {
+                a.report = fresh;
+                changed = true;
+            }
+        }
+        if changed {
+            self.save_error = store::save(&self.attempts).err().map(|e| e.to_string());
         }
     }
 
@@ -468,6 +491,7 @@ impl App {
         let loaded = exam::load_all(&self.extra_paths);
         self.exams = loaded.exams;
         self.load_errors = loaded.errors;
+        self.regrade();
         if !self.load_errors.is_empty() {
             self.modal = Some(Modal::LoadErrors);
         }
@@ -506,7 +530,7 @@ impl App {
                     .iter()
                     .filter(|a| a.exam_id == self.exams[ei].id)
                     .min_by_key(|a| a.started_at)
-                    .map(|a| a.report.pct());
+                    .map(|a| a.report.score_pct());
                 (ei, first)
             })
             .collect()

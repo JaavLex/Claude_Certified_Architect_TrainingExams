@@ -40,7 +40,7 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "maximum": 100,
-            "description": "Optional: this domain's share of the real exam in percent (e.g. 27). When set, results also show a score estimate weighted by these shares."
+            "description": "Optional: this domain's share of the real exam in percent (e.g. 27). When domains have weights, the scaled score counts each domain's percent correct at its share (shares are rescaled to 100% over the domains present); domains without a weight do not count. Without weights, every question counts the same."
           }
         },
         "additionalProperties": false

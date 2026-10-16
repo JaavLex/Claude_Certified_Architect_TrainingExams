@@ -1,0 +1,19 @@
+# Rust build output
+/target/
+**/*.rs.bk
+*.pdb
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local attempt history if the data dir falls back to the working directory
+/exam-tui/attempts.json
+attempts.json.tmp

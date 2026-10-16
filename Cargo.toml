@@ -1,0 +1,19 @@
+[package]
+name = "exam-tui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Timed TUI practice exams for the Claude Certified Architect – Foundations (CCAR-F) certification"
+license = "MIT"
+repository = "https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams"
+readme = "README.md"
+keywords = ["tui", "exam", "ratatui", "claude", "certification"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+chrono = "0.4.45"
+dirs = "7.0.0"
+ratatui = "0.30.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+unicode-width = "0.2.2"

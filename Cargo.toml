@@ -1,6 +1,6 @@
 [package]
 name = "exam-tui"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Timed TUI practice exams for the Claude Certified Architect – Foundations (CCAR-F) certification"

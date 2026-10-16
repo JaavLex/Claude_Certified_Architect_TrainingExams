@@ -23,14 +23,14 @@ No install needed: one small download per system (under 1.3 MB). The app uses yo
 
 ## 🚀 Download and launch
 
-**1. Download the file for your system** (v1.0.0):
+**1. Download the file for your system** (v1.1.0):
 
 | System | Download |
 |---|---|
-| 🪟 **Windows** 10/11 | [**exam-tui-v1.0.0-windows-x86_64.zip**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-windows-x86_64.zip) |
-| 🍎 **macOS** (Apple Silicon and Intel) | [**exam-tui-v1.0.0-macos-universal.zip**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-macos-universal.zip) |
-| 🐧 **Linux** x86_64 (any distro) | [**exam-tui-v1.0.0-linux-x86_64.tar.gz**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-linux-x86_64.tar.gz) |
-| 🐧 **Linux** ARM64 (e.g. Raspberry Pi) | [**exam-tui-v1.0.0-linux-aarch64.tar.gz**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-linux-aarch64.tar.gz) |
+| 🪟 **Windows** 10/11 | [**exam-tui-v1.1.0-windows-x86_64.zip**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-windows-x86_64.zip) |
+| 🍎 **macOS** (Apple Silicon and Intel) | [**exam-tui-v1.1.0-macos-universal.zip**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-macos-universal.zip) |
+| 🐧 **Linux** x86_64 (any distro) | [**exam-tui-v1.1.0-linux-x86_64.tar.gz**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-linux-x86_64.tar.gz) |
+| 🐧 **Linux** ARM64 (e.g. Raspberry Pi) | [**exam-tui-v1.1.0-linux-aarch64.tar.gz**](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-linux-aarch64.tar.gz) |
 
 All files, including checksums (`SHA256SUMS.txt`), are on the [releases page](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/latest).
 
@@ -73,12 +73,12 @@ The warnings appear because the app is not code-signed; they only show on the fi
 
 ```sh
 # macOS (files downloaded with curl skip the Gatekeeper prompt)
-curl -LO https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-macos-universal.zip
-unzip exam-tui-v1.0.0-macos-universal.zip && ./exam-tui-v1.0.0-macos-universal/exam-tui
+curl -LO https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-macos-universal.zip
+unzip exam-tui-v1.1.0-macos-universal.zip && ./exam-tui-v1.1.0-macos-universal/exam-tui
 
 # Linux x86_64
-curl -L https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.0.0/exam-tui-v1.0.0-linux-x86_64.tar.gz | tar -xz
-./exam-tui-v1.0.0-linux-x86_64/exam-tui
+curl -L https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/download/v1.1.0/exam-tui-v1.1.0-linux-x86_64.tar.gz | tar -xz
+./exam-tui-v1.1.0-linux-x86_64/exam-tui
 ```
 
 On macOS you can also remove the warning for a downloaded copy with `xattr -d com.apple.quarantine exam-tui`.

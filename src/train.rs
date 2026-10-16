@@ -180,6 +180,7 @@ mod tests {
             time_limit_secs: 0,
             timed_out: false,
             report: crate::score::score(&exams[0], &answers),
+            question_secs: vec![],
             answers,
         };
         let mut second = answers.clone();

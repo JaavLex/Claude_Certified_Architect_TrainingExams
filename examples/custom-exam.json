@@ -5,8 +5,8 @@
   "description": "A short example showing the exam file format. Copy it, change the questions, and put it in your exam folder.",
   "time_limit_minutes": 5,
   "domains": [
-    { "id": "D1", "name": "Agentic Architecture & Orchestration" },
-    { "id": "D2", "name": "Tool Design & MCP Integration" }
+    { "id": "D1", "name": "Agentic Architecture & Orchestration", "weight": 60 },
+    { "id": "D2", "name": "Tool Design & MCP Integration", "weight": 40 }
   ],
   "questions": [
     {

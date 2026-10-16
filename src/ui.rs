@@ -288,13 +288,45 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     } else if items.get(cursor) == Some(&MenuItem::History) {
         let total = app.attempts.len();
         let passed = app.attempts.iter().filter(|a| a.report.passed).count();
-        vec![
+        let mut v = vec![
             Line::from("Review and compare previous attempts").bold(),
+            Line::from(format!("{total} attempt(s) recorded, {passed} passed")).fg(DIM),
             Line::raw(""),
-            Line::from(format!("{total} attempt(s) recorded, {passed} passed")),
-            Line::raw(""),
-            Line::from(crate::store::path().display().to_string()).fg(DIM),
-        ]
+            Line::from(format!(
+                "Readiness · first timed attempt ≥{:.0}%, ≥{:.0}% = exam-ready",
+                score::FIRST_ATTEMPT_TARGET,
+                score::EXAM_READY
+            ))
+            .fg(DIM),
+        ];
+        for (ei, first) in app.first_attempts() {
+            let name = app.exams[ei].short_title();
+            v.push(match first {
+                None => Line::from(vec![
+                    Span::styled(" ○ ", Style::new().fg(DIM)),
+                    Span::raw(name),
+                    Span::styled("  not taken yet", Style::new().fg(DIM)),
+                ]),
+                Some(p) => {
+                    let (mark, color) = if p >= score::FIRST_ATTEMPT_TARGET { (" ✓ ", GOOD) } else { (" ✗ ", BAD) };
+                    let mut spans = vec![
+                        Span::styled(mark, Style::new().fg(color).bold()),
+                        Span::raw(name),
+                        Span::styled(format!("  {p:.1}%"), Style::new().fg(color).bold()),
+                    ];
+                    if p >= score::EXAM_READY {
+                        spans.push(Span::styled("  ★ exam-ready", Style::new().fg(GOOD)));
+                    }
+                    Line::from(spans)
+                }
+            });
+        }
+        let weak = app.question_stats().values().filter(|s| s.is_weak()).count();
+        v.push(Line::from(vec![
+            Span::styled(if weak == 0 { " ✓ " } else { " • " }, Style::new().fg(if weak == 0 { GOOD } else { WARN }).bold()),
+            Span::raw(format!("{weak} weak question(s) left to train")),
+        ]));
+        v
     } else {
         vec![Line::from("Exit the simulator").fg(DIM)]
     };
@@ -324,7 +356,7 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
 
 fn draw_intro(f: &mut Frame, area: Rect, app: &App, exam: usize) {
     let e = &app.exams[exam];
-    let box_ = centered(area, 76, 18);
+    let box_ = centered(area, 76, 19);
     let rule = |k: &str, v: &str| {
         Line::from(vec![Span::styled(format!("{k:<14}"), Style::new().fg(DIM)), Span::raw(v.to_string())])
     };
@@ -337,6 +369,10 @@ fn draw_intro(f: &mut Frame, area: Rect, app: &App, exam: usize) {
         rule("Multi-select", "Select EXACTLY the stated number; no partial credit"),
         rule("Unanswered", "Scored as incorrect — no penalty for guessing"),
         rule("Report", "Pass/fail, scaled score, percent-correct by domain"),
+        rule("Pace", &{
+            let per = e.time_limit_secs() / e.questions.len().max(1) as u64;
+            format!("{} per question; past {} guess, flag, move on", fmt_ms(per), fmt_ms(per * 3 / 2))
+        }),
         Line::raw(""),
         Line::from("Rules: no notes, no docs. You can move freely between questions,").fg(DIM),
         Line::from("flag items for later, and change answers until you submit.").fg(DIM),
@@ -380,6 +416,8 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
         Span::styled("  │  ", Style::new().fg(DIM)),
         Span::styled(format!("{flagged}"), Style::new().fg(FLAG).bold()),
         Span::styled(" flagged", Style::new().fg(DIM)),
+        Span::styled("  │  ", Style::new().fg(DIM)),
+        pace_span(s.pace_delta(answered), s.pace_per_question()),
     ]);
     f.render_widget(Paragraph::new(head), header);
 
@@ -444,6 +482,12 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
         ),
         Span::styled(format!("  {}/{} selected", chosen.len(), q.select), Style::new().fg(sel_color)),
     ];
+    let on_q = s.time_on(s.current);
+    let slow_after = s.pace_per_question() * 3 / 2;
+    badge.push(Span::styled(
+        format!("  ⏱ {}", fmt_ms(on_q.as_secs())),
+        Style::new().fg(if on_q >= slow_after { WARN } else { DIM }),
+    ));
     if s.flagged[s.current] {
         badge.push(Span::styled("  ⚑ flagged", Style::new().fg(FLAG).bold()));
     }
@@ -453,6 +497,20 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
     lines.push(Line::raw(""));
 
     let cursor_line = push_options(&mut lines, q, chosen, s.cursor, inner_w);
+    // Study plan, test-day tactics: if a question eats 3 minutes, guess, flag, move on.
+    if on_q >= slow_after && !is_complete(q, chosen) && !s.flagged[s.current] {
+        lines.extend(wrap(
+            vec![Span::styled("  ⏱ ", Style::new().fg(WARN))],
+            vec![Span::styled(
+                format!(
+                    "Over {} on this question. Pick your best guess, flag it with f, and come back at the end.",
+                    fmt_ms(slow_after.as_secs())
+                ),
+                Style::new().fg(WARN),
+            )],
+            inner_w,
+        ));
+    }
     if let Some(n) = s.notice() {
         lines.push(Line::from(format!("  ⚠ {n}")).fg(WARN));
     }
@@ -654,7 +712,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1)]).areas(area);
     let content = centered(content, 96, content.height);
     let [hero, scale, domains] =
-        Layout::vertical([Constraint::Length(10), Constraint::Length(5), Constraint::Fill(1)]).areas(content);
+        Layout::vertical([Constraint::Length(12), Constraint::Length(5), Constraint::Fill(1)]).areas(content);
 
     // Hero: big PASS/FAIL + numbers
     let [big, nums] = Layout::horizontal([Constraint::Length(36), Constraint::Fill(1)]).areas(hero);
@@ -666,7 +724,40 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
 
     let shown_scaled = (SCALE_MIN as f64 + (r.scaled - SCALE_MIN) as f64 * t).round() as u32;
     let shown_correct = (r.correct as f64 * t).round() as usize;
-    let num_lines = vec![
+    let n_attempt = app.attempt_number(idx);
+    let attempt_line = if n_attempt == 1 {
+        Line::from(vec![
+            Span::styled("Attempt   ", Style::new().fg(DIM)),
+            Span::raw("#1 · first attempt "),
+            if r.pct() >= score::FIRST_ATTEMPT_TARGET {
+                Span::styled(format!("✓ meets the ≥{:.0}% target", score::FIRST_ATTEMPT_TARGET), Style::new().fg(GOOD))
+            } else {
+                Span::styled(format!("· study-plan target ≥{:.0}%", score::FIRST_ATTEMPT_TARGET), Style::new().fg(WARN))
+            },
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled("Attempt   ", Style::new().fg(DIM)),
+            Span::raw(format!("#{n_attempt} on this exam ")),
+            Span::styled("· retakes score higher; the first attempt is the readiness signal", Style::new().fg(DIM)),
+        ])
+    };
+    let pace_line = (!a.question_secs.is_empty()).then(|| {
+        let answered_secs: Vec<u64> = a.question_secs.iter().copied().filter(|&s| s > 0).collect();
+        let avg = answered_secs.iter().sum::<u64>() / answered_secs.len().max(1) as u64;
+        let target = a.time_limit_secs / r.total.max(1) as u64;
+        let slow = a.question_secs.iter().filter(|&&s| s * 2 >= target * 3).count();
+        let mut spans = vec![
+            Span::styled("Pace      ", Style::new().fg(DIM)),
+            Span::styled(format!("{} per question", fmt_ms(avg)), Style::new().fg(if avg <= target { GOOD } else { WARN })),
+            Span::styled(format!(" (target {})", fmt_ms(target)), Style::new().fg(DIM)),
+        ];
+        if slow > 0 {
+            spans.push(Span::styled(format!(" · {slow} took over {}", fmt_ms(target * 3 / 2)), Style::new().fg(WARN)));
+        }
+        Line::from(spans)
+    });
+    let mut num_lines = vec![
         Line::from(vec![
             Span::styled(format!("{shown_scaled}"), Style::new().fg(color).bold()),
             Span::styled(format!(" / {SCALE_MAX}  scaled score"), Style::new().fg(DIM)),
@@ -682,6 +773,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
             Span::raw(a.exam_title.split(" — ").next().unwrap_or("").to_string()),
         ]),
         Line::from(vec![Span::styled("Taken     ", Style::new().fg(DIM)), Span::raw(fmt_date(a.started_at))]),
+        attempt_line,
         Line::from(vec![
             Span::styled("Time used ", Style::new().fg(DIM)),
             Span::raw(format!("{} of {}", fmt_hms(a.duration_secs), fmt_hms(a.time_limit_secs))),
@@ -696,6 +788,9 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
             Span::styled(score::readiness(r.pct()).to_string(), Style::new().italic()),
         ]),
     ];
+    if let Some(p) = pace_line {
+        num_lines.insert(num_lines.len() - 2, p);
+    }
     f.render_widget(
         Paragraph::new(num_lines).wrap(Wrap { trim: false }).block(Block::default().padding(Padding::top(1))),
         nums,
@@ -707,7 +802,8 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
 
     // Per-domain table
     let prev = app.previous_attempt(idx);
-    let bar_w = (domains.width as usize).saturating_sub(70).clamp(10, 30);
+    let bar_w = (domains.width as usize).saturating_sub(80).clamp(8, 30);
+    let lost: std::collections::HashMap<String, f64> = r.points_lost().into_iter().collect();
     let mut lines = vec![Line::raw("")];
     for d in r.domains.iter().filter(|d| d.total > 0) {
         let mut spans = vec![
@@ -717,12 +813,39 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         ];
         spans.extend(mini_bar(d.pct() * t, bar_w));
         spans.push(Span::styled(format!(" {:>5.1}%", d.pct()), Style::new().bold()));
+        match lost.get(&d.domain) {
+            Some(l) => spans.push(Span::styled(format!(" {:>5} pts", format!("−{:.0}", l)), Style::new().fg(BAD))),
+            None => spans.push(Span::styled(format!(" {:>9}", ""), Style::new())),
+        }
         if let Some(p) = prev {
             if let Some(pd) = app.attempts[p].report.domains.iter().find(|x| x.domain == d.domain) {
                 spans.push(delta_span(d.pct() - pd.pct(), " pp"));
             }
         }
         lines.push(Line::from(spans));
+    }
+    lines.push(Line::raw(""));
+    // Where the points went: the study plan warns one weak domain can sink you.
+    if let Some((d, l)) = r.points_lost().first() {
+        lines.push(Line::from(vec![
+            Span::styled("Focus next  ", Style::new().fg(DIM)),
+            Span::styled(format!("{d} "), Style::new().fg(ACCENT).bold()),
+            Span::raw(domain_name(app, a, d)),
+            Span::styled(format!("  cost you {l:.0} scaled points"), Style::new().fg(BAD)),
+        ]));
+    }
+    let exam = app.exam_index(&a.exam_id).map(|e| &app.exams[e]);
+    if let Some(w) = exam.and_then(|e| score::weighted_estimate(e, r)) {
+        lines.push(Line::from(vec![
+            Span::styled("Estimate    ", Style::new().fg(DIM)),
+            Span::styled(format!("≈ {} ", w.scaled), Style::new().fg(if w.passed { GOOD } else { BAD }).bold()),
+            Span::styled(format!("({:.1}%) ", w.pct), Style::new().fg(DIM)),
+            if w.passed { Span::styled("would pass", Style::new().fg(GOOD)) } else { Span::styled("would not pass", Style::new().fg(BAD)) },
+            Span::styled(" with domains weighted as on the real exam", Style::new().fg(DIM)),
+        ]));
+        if w.coverage < 99.5 {
+            lines.push(Line::from(format!("            (only {:.0}% of the blueprint is covered by this exam's domains)", w.coverage)).fg(DIM));
+        }
     }
     lines.push(Line::raw(""));
     let note = if let Some(p) = prev {
@@ -749,6 +872,21 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         key_hint(&[("r", "review all"), ("w", "review incorrect"), ("h", "history"), ("enter", "back")]),
         foot,
     );
+}
+
+/// Header pace indicator: answered vs where the 2-min-per-question pace says you should be.
+fn pace_span(delta: i64, per_q: Duration) -> Span<'static> {
+    let per = fmt_ms(per_q.as_secs());
+    match delta {
+        d if d >= 0 => Span::styled(format!("on pace ({per}/q)"), Style::new().fg(GOOD)),
+        d if d > -5 => Span::styled(format!("{} behind pace ({per}/q)", -d), Style::new().fg(WARN)),
+        d => Span::styled(format!("{} behind pace ({per}/q)", -d), Style::new().fg(BAD).bold()),
+    }
+}
+
+/// 125 → "2:05"
+fn fmt_ms(secs: u64) -> String {
+    format!("{}:{:02}", secs / 60, secs % 60)
 }
 
 fn domain_name(app: &App, a: &Attempt, id: &str) -> String {
@@ -862,6 +1000,16 @@ fn draw_review(
         Span::styled(format!("{} ", q.domain), Style::new().fg(ACCENT)),
         Span::styled(e.domain_name(&q.primary_domain()), Style::new().fg(DIM)),
         Span::styled(format!("  ·  {}", short_scenario(&q.scenario)), Style::new().fg(DIM)),
+        match a.question_secs.get(qi) {
+            Some(&secs) => {
+                let target = a.time_limit_secs / e.questions.len().max(1) as u64;
+                Span::styled(
+                    format!("  ·  ⏱ {}", fmt_ms(secs)),
+                    Style::new().fg(if secs * 2 >= target * 3 { WARN } else { DIM }),
+                )
+            }
+            None => Span::raw(""),
+        },
     ]));
     d.push(Line::raw(""));
     d.extend(wrap(vec![], md_spans(&q.text, Style::new().bold()), w));

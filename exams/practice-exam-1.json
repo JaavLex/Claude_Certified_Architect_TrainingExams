@@ -6,23 +6,28 @@
   "domains": [
     {
       "id": "D1",
-      "name": "Agentic Architecture & Orchestration"
+      "name": "Agentic Architecture & Orchestration",
+      "weight": 27
     },
     {
       "id": "D2",
-      "name": "Tool Design & MCP Integration"
+      "name": "Tool Design & MCP Integration",
+      "weight": 18
     },
     {
       "id": "D3",
-      "name": "Claude Code Configuration & Workflows"
+      "name": "Claude Code Configuration & Workflows",
+      "weight": 20
     },
     {
       "id": "D4",
-      "name": "Prompt Engineering & Structured Output"
+      "name": "Prompt Engineering & Structured Output",
+      "weight": 20
     },
     {
       "id": "D5",
-      "name": "Context Management & Reliability"
+      "name": "Context Management & Reliability",
+      "weight": 15
     },
     {
       "id": "Misc",

@@ -16,6 +16,9 @@ pub struct Attempt {
     pub time_limit_secs: u64,
     pub timed_out: bool,
     pub answers: Vec<Vec<char>>,
+    /// Seconds spent on each question (empty for attempts saved before 1.1).
+    #[serde(default)]
+    pub question_secs: Vec<u64>,
     pub report: ScoreReport,
 }
 

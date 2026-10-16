@@ -35,7 +35,13 @@
         "required": ["id", "name"],
         "properties": {
           "id": { "type": "string", "minLength": 1, "examples": ["D1"] },
-          "name": { "type": "string", "examples": ["Agentic Architecture & Orchestration"] }
+          "name": { "type": "string", "examples": ["Agentic Architecture & Orchestration"] },
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100,
+            "description": "Optional: this domain's share of the real exam in percent (e.g. 27). When set, results also show a score estimate weighted by these shares."
+          }
         },
         "additionalProperties": false
       }

@@ -113,6 +113,8 @@ On macOS you can also remove the warning for a downloaded copy with `xattr -d co
 - ☑️ **Exam-style answers**: each question says how many to pick ("Select 1", "Select 2") and you must pick exactly that many.
 - 🧭 **Navigator**: see which questions are answered, incomplete, flagged or unanswered; flag questions and jump to any of them.
 - 🎯 **Official-style scoring**: PASS/FAIL, scaled score 100–1,000, pass at 720, percent correct per domain, and readiness advice.
+- 📊 **Grading insights**: points lost per domain, the domain to focus on next, and a score estimate weighted like the real exam's domain mix.
+- 🏃 **Pacing coach**: an on-pace indicator, a timer for each question, and a "guess, flag, move on" prompt when one takes over 3 minutes.
 - 🔍 **Full review**: every question with your answer, the correct answer and the explanation. Filter to only the ones you got wrong.
 - 💪 **Train weaknesses**: practise the questions you miss most often, with instant feedback, until you get each right twice in a row.
 - 📈 **Attempt history**: compare each attempt with the previous one, domain by domain, with a score trend chart.
@@ -137,6 +139,21 @@ Scoring follows the CCAR-F Exam Guide, section 10, "How the Exam Is Scored":
 > The official conversion from correct answers to the 100–1,000 scale is not published. This app uses a straight-line conversion, `scaled = 100 + 900 × correct / items`, so passing a 60-item exam takes **42 of 60 correct (70%)**.
 
 A question tagged with two domains (e.g. `D4/1`) counts under the first one. Custom exams are scored with the same rules; only the number of items and the time limit can differ.
+
+### What the results also show
+
+These come from the Exam Guide and the study guide that comes with these practice exams:
+
+| On screen | Where it comes from | What it tells you |
+|---|---|---|
+| **Estimate** ≈ score, would pass / would not pass | Exam Guide §4: domain weights (D1 27%, D2 18%, D3 20%, D4 20%, D5 15%) are "the approximate proportion of scored items drawn from each domain" | Your percent correct per domain, weighted as on the real exam. The practice exams' own mix differs (Practice Exam #1 has only 5 D2 questions, against about 11 on the real exam), so this is a better guess at your real result than the raw score. |
+| **−pts** per domain and **Focus next** | Study plan: "a single weak domain can sink you" | How many scaled points each domain cost you (each question is worth 15 points on a 60-item exam), and which domain to study first. |
+| **Attempt #1 · first attempt** | Study plan §6 and the pre-exam checklist: "≥85% on both practice exams on first full attempt, timed"; ≥90% means exam-ready | Whether this attempt counts toward readiness. Retakes score higher because you've seen the questions. |
+| **Pace** per question, and questions over 3:00 | Study plan, test-day tactics: "2 min/question. If a question eats 3 min, guess + flag, move on" | Whether you'd finish in time, and which questions slowed you down. The review screen shows the time spent on each question. |
+
+The **Attempt history** entry on the menu shows the readiness checklist: your first-attempt score on each exam against the 85% target, ★ when it reaches 90%, and how many weak questions are left to train.
+
+During the exam, the header shows whether you're **on pace** (2:00 per question), and each question shows its own timer. If a question you haven't answered passes 3:00, a prompt suggests picking your best guess, flagging it and moving on.
 
 ## 💪 Train your weaknesses
 
@@ -200,7 +217,7 @@ Custom exams are marked with ✦ in the menu. To remove one, press `o`, delete i
   "description": "Shown in the menu.",
   "time_limit_minutes": 120,
   "domains": [
-    { "id": "D1", "name": "Agentic Architecture & Orchestration" }
+    { "id": "D1", "name": "Agentic Architecture & Orchestration", "weight": 27 }
   ],
   "questions": [
     {
@@ -231,7 +248,7 @@ Custom exams are marked with ✦ in the menu. To remove one, press `o`, delete i
 | `title` | yes | Full title. The part before ` — ` is the short name in menus. |
 | `description` | no | Text shown in the menu's Details panel. |
 | `time_limit_minutes` | no | Time limit. Default: 120. |
-| `domains` | no | `id`/`name` pairs for the per-domain breakdown, in display order. |
+| `domains` | no | `id`/`name` pairs for the per-domain breakdown, in display order. Add `weight` (a percent, e.g. `27`) to each to get the weighted **Estimate** in the results. |
 | `questions` | yes | At least one question. |
 
 **Question**

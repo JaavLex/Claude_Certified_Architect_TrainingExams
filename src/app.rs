@@ -19,9 +19,58 @@ pub struct Session {
     pub started: Instant,
     pub started_unix: i64,
     pub notice: Option<(String, Instant)>,
+    /// Time spent on each question before the current visit.
+    pub q_time: Vec<Duration>,
+    /// When the current visit to `current` began.
+    pub q_started: Instant,
 }
 
 impl Session {
+    pub fn new(exam: usize, n: usize, limit: Duration) -> Self {
+        let now = Instant::now();
+        Session {
+            exam,
+            current: 0,
+            cursor: 0,
+            limit,
+            answers: vec![Vec::new(); n],
+            flagged: vec![false; n],
+            started: now,
+            started_unix: chrono::Local::now().timestamp(),
+            notice: None,
+            q_time: vec![Duration::ZERO; n],
+            q_started: now,
+        }
+    }
+
+    /// Move to question `i`, crediting the time spent on the current one.
+    pub fn go_to(&mut self, i: usize) {
+        let now = Instant::now();
+        self.q_time[self.current] += now - self.q_started;
+        self.q_started = now;
+        self.current = i;
+        self.cursor = 0;
+    }
+
+    /// Total time spent on question `i` so far, including the current visit.
+    pub fn time_on(&self, i: usize) -> Duration {
+        let live = if i == self.current { self.q_started.elapsed() } else { Duration::ZERO };
+        self.q_time[i] + live
+    }
+
+    /// Target time per question: the time limit spread evenly over the items
+    /// (2 minutes for 60 items in 120 minutes, the study plan's pace).
+    pub fn pace_per_question(&self) -> Duration {
+        self.limit / self.answers.len().max(1) as u32
+    }
+
+    /// Answered questions minus the number the pace says should be done by now.
+    /// Negative means behind.
+    pub fn pace_delta(&self, answered: usize) -> i64 {
+        let expected = self.elapsed().as_secs_f64() / self.pace_per_question().as_secs_f64().max(1.0);
+        answered as i64 - expected.floor() as i64
+    }
+
     pub fn total(&self) -> Duration {
         self.limit
     }
@@ -440,6 +489,29 @@ impl App {
         rows
     }
 
+    /// 1-based position of attempt `idx` among attempts on the same exam.
+    pub fn attempt_number(&self, idx: usize) -> usize {
+        let a = &self.attempts[idx];
+        self.attempts.iter().filter(|b| b.exam_id == a.exam_id && b.started_at <= a.started_at).count()
+    }
+
+    /// Readiness checklist (study plan §6 and the pre-exam checklist): the
+    /// first timed attempt on each exam, which is what the targets refer to.
+    /// Returns (exam index, first-attempt percent) for every exam.
+    pub fn first_attempts(&self) -> Vec<(usize, Option<f64>)> {
+        (0..self.exams.len())
+            .map(|ei| {
+                let first = self
+                    .attempts
+                    .iter()
+                    .filter(|a| a.exam_id == self.exams[ei].id)
+                    .min_by_key(|a| a.started_at)
+                    .map(|a| a.report.pct());
+                (ei, first)
+            })
+            .collect()
+    }
+
     /// The attempt on the same exam immediately before `idx`.
     pub fn previous_attempt(&self, idx: usize) -> Option<usize> {
         let a = &self.attempts[idx];
@@ -481,6 +553,7 @@ impl App {
             time_limit_secs: s.limit.as_secs(),
             timed_out,
             answers: s.answers.clone(),
+            question_secs: (0..s.answers.len()).map(|i| s.time_on(i).as_secs()).collect(),
             report,
         });
         self.save_error = store::save(&self.attempts).err().map(|e| e.to_string());
@@ -562,17 +635,7 @@ impl App {
                 KeyCode::Enter => {
                     let n = self.exams[*exam].questions.len();
                     let limit = Duration::from_secs(self.exams[*exam].time_limit_secs());
-                    self.screen = Screen::Exam(Session {
-                        exam: *exam,
-                        current: 0,
-                        cursor: 0,
-                        limit,
-                        answers: vec![Vec::new(); n],
-                        flagged: vec![false; n],
-                        started: Instant::now(),
-                        started_unix: chrono::Local::now().timestamp(),
-                        notice: None,
-                    });
+                    self.screen = Screen::Exam(Session::new(*exam, n, limit));
                 }
                 KeyCode::Esc | KeyCode::Char('q') => self.screen = Screen::Menu { cursor: *exam },
                 _ => {}
@@ -648,8 +711,7 @@ impl App {
                     let n: usize = buf.parse().unwrap_or(0);
                     if let Screen::Exam(s) = &mut self.screen {
                         if n >= 1 && n <= s.answers.len() {
-                            s.current = n - 1;
-                            s.cursor = 0;
+                            s.go_to(n - 1);
                         }
                     }
                     self.modal = None;
@@ -725,23 +787,19 @@ impl App {
             }
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('n') | KeyCode::Tab => {
                 if s.current < last {
-                    s.current += 1;
-                    s.cursor = 0;
+                    s.go_to(s.current + 1);
                 }
             }
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('p') | KeyCode::BackTab => {
                 if s.current > 0 {
-                    s.current -= 1;
-                    s.cursor = 0;
+                    s.go_to(s.current - 1);
                 }
             }
             KeyCode::Home => {
-                s.current = 0;
-                s.cursor = 0;
+                s.go_to(0);
             }
             KeyCode::End => {
-                s.current = last;
-                s.cursor = 0;
+                s.go_to(last);
             }
             KeyCode::Char('f') => s.flagged[s.current] = !s.flagged[s.current],
             KeyCode::Char('u') => {
@@ -752,8 +810,7 @@ impl App {
                     .map(|k| (s.current + k) % n)
                     .find(|&i| s.answers[i].len() != exam.questions[i].select)
                 {
-                    s.current = i;
-                    s.cursor = 0;
+                    s.go_to(i);
                 } else {
                     s.notice = Some(("All questions answered".into(), Instant::now()));
                 }
@@ -762,8 +819,7 @@ impl App {
                 // Next flagged question (wrapping).
                 let n = s.answers.len();
                 if let Some(i) = (1..=n).map(|k| (s.current + k) % n).find(|&i| s.flagged[i]) {
-                    s.current = i;
-                    s.cursor = 0;
+                    s.go_to(i);
                 } else {
                     s.notice = Some(("No flagged questions".into(), Instant::now()));
                 }

@@ -69,6 +69,10 @@ impl Question {
 pub struct Domain {
     pub id: String,
     pub name: String,
+    /// Share of the real exam's scored items drawn from this domain, in percent
+    /// (Exam Guide §4 blueprint). Used for the blueprint-weighted estimate.
+    #[serde(default)]
+    pub weight: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -136,6 +140,11 @@ pub fn validate(e: &Exam) -> Result<(), String> {
     }
     if e.questions.is_empty() {
         return Err("exam has no questions".into());
+    }
+    for d in &e.domains {
+        if d.weight.is_some_and(|w| !(w > 0.0 && w <= 100.0)) {
+            return Err(format!("domain \"{}\": \"weight\" must be between 0 and 100", d.id));
+        }
     }
     let mut numbers = HashSet::new();
     for q in &e.questions {

@@ -112,7 +112,7 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     f.render_widget(
         Paragraph::new(vec![
             Line::from("Claude Certified Architect — Foundations").bold(),
-            Line::from("Practice exam simulator").fg(DIM),
+            Line::from(format!("Practice exam simulator · v{}", env!("CARGO_PKG_VERSION"))).fg(DIM),
         ])
         .alignment(Alignment::Center),
         sub,

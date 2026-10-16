@@ -4,6 +4,24 @@ A terminal app for taking timed practice exams for the **Claude Certified Archit
 
 Built in Rust with [ratatui](https://ratatui.rs). It uses only your terminal's own colours, so it matches your theme.
 
+## Download
+
+No installation and no Rust needed. Get the file for your system from the [latest release](https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/releases/latest), unzip it, and run it:
+
+| System | File | How to start it |
+|---|---|---|
+| Windows 10/11 | `exam-tui-…-windows-x86_64.zip` | Double-click `exam-tui.exe` |
+| macOS (Apple Silicon and Intel) | `exam-tui-…-macos-universal.zip` | Double-click `exam-tui`; it opens in Terminal |
+| Linux x86_64 | `exam-tui-…-linux-x86_64.tar.gz` | `./exam-tui` in a terminal |
+| Linux ARM64 | `exam-tui-…-linux-aarch64.tar.gz` | `./exam-tui` in a terminal |
+
+The app is not code-signed, so the first time you run it:
+
+- **Windows** may show "Windows protected your PC". Click **More info → Run anyway**.
+- **macOS** may say it cannot verify the app. Open **System Settings → Privacy & Security** and click **Open Anyway**, or run `xattr -d com.apple.quarantine exam-tui` in the unzipped folder.
+
+The Linux builds are static, so they run on any distribution. Each download also includes this README and `example-exam.json`, a template for your own exams.
+
 ## Features
 
 - **Two full practice exams.** Pick Practice Exam #1 or #2 from the menu. Each has 60 scenario-based questions.
@@ -48,9 +66,9 @@ Choose **Train weaknesses** on the menu (or press `t`) to practise the questions
 
 Training results are saved separately from exam attempts, so they never change your exam scores or history comparisons.
 
-## Install and run
+## Build from source
 
-You need a [Rust toolchain](https://rustup.rs) (edition 2024, Rust 1.85 or newer).
+To build it yourself instead of downloading it, you need a [Rust toolchain](https://rustup.rs) (edition 2024, Rust 1.85 or newer).
 
 ```sh
 git clone git@github.com:JaavLex/Claude_Certified_Architect_TrainingExams.git
@@ -71,6 +89,7 @@ Command-line options:
 exam-tui                          # built-in exams + your exam folder
 exam-tui my-exam.json other/      # also load these files or folders
 exam-tui my-exam.json --check     # validate exam files and exit
+exam-tui --version
 exam-tui --help
 ```
 
@@ -235,6 +254,13 @@ It checks, for example, that `answer` has exactly `select` keys, that every answ
 
 Run `cargo test` to check the built-in exams. They must keep the official format of 60 items and 120 minutes.
 
+## Releasing a new version
+
+1. Change `version` in `Cargo.toml` and update `.github/RELEASE_NOTES.md`.
+2. Commit, then tag and push: `git tag v1.1.0 && git push origin main v1.1.0`.
+
+The [Release workflow](.github/workflows/release.yml) then tests and builds every platform, and publishes the files to a GitHub release. The [CI workflow](.github/workflows/ci.yml) tests every push to `main` on Linux, macOS and Windows.
+
 ## Project layout
 
 ```
@@ -248,6 +274,7 @@ src/
   paths.rs  reading typed, pasted and dragged paths on every OS
   store.rs  saved attempt history and training log
   text.rs   formatting and line wrapping
+.github/    CI and release workflows, release notes
 exams/      built-in practice exams (JSON)
 examples/   example custom exam
 schema/     JSON Schema for exam files

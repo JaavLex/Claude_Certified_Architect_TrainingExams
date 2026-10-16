@@ -1,6 +1,6 @@
 [package]
 name = "exam-tui"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Timed TUI practice exams for the Claude Certified Architect – Foundations (CCAR-F) certification"
@@ -17,3 +17,8 @@ ratatui = "0.30.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 unicode-width = "0.2.2"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

@@ -1,0 +1,150 @@
+name: Release
+
+# Push a tag like v1.0.0 to build every platform and publish a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build, e.g. v1.0.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          - name: macos-universal
+            os: macos-latest
+            target: aarch64-apple-darwin
+            extra_target: x86_64-apple-darwin
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}${{ matrix.extra_target && format(',{0}', matrix.extra_target) || '' }}
+
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build
+        shell: bash
+        run: |
+          cargo build --locked --release --target ${{ matrix.target }}
+          if [ -n "${{ matrix.extra_target }}" ]; then
+            cargo build --locked --release --target ${{ matrix.extra_target }}
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="exam-tui-${TAG}-${{ matrix.name }}"
+          mkdir -p "dist/$name"
+          case "${{ matrix.name }}" in
+            macos-universal)
+              # One binary for Apple Silicon and Intel Macs.
+              lipo -create \
+                target/aarch64-apple-darwin/release/exam-tui \
+                target/x86_64-apple-darwin/release/exam-tui \
+                -output "dist/$name/exam-tui"
+              # Ad-hoc signature: required for the binary to run on Apple Silicon.
+              codesign --force --sign - "dist/$name/exam-tui"
+              ;;
+            windows-*)
+              cp "target/${{ matrix.target }}/release/exam-tui.exe" "dist/$name/"
+              ;;
+            *)
+              cp "target/${{ matrix.target }}/release/exam-tui" "dist/$name/"
+              ;;
+          esac
+          cp README.md LICENSE "dist/$name/"
+          cp examples/custom-exam.json "dist/$name/example-exam.json"
+          cd dist
+          case "${{ matrix.name }}" in
+            linux-*)
+              chmod +x "$name/exam-tui"
+              tar -czf "$name.tar.gz" "$name"
+              echo "ASSET=dist/$name.tar.gz" >> "$GITHUB_ENV"
+              ;;
+            macos-*)
+              chmod +x "$name/exam-tui"
+              # ditto keeps the executable bit and signature; Finder unzips it natively.
+              ditto -c -k --keepParent "$name" "$name.zip"
+              echo "ASSET=dist/$name.zip" >> "$GITHUB_ENV"
+              ;;
+            windows-*)
+              7z a -tzip "$name.zip" "$name" > /dev/null
+              echo "ASSET=dist/$name.zip" >> "$GITHUB_ENV"
+              ;;
+          esac
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          case "${{ matrix.name }}" in
+            windows-*) exe="target/${{ matrix.target }}/release/exam-tui.exe" ;;
+            macos-*)   exe="dist/exam-tui-${TAG}-${{ matrix.name }}/exam-tui" ;;
+            *)         exe="target/${{ matrix.target }}/release/exam-tui" ;;
+          esac
+          "$exe" --version
+          "$exe" examples --check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "exam-tui $TAG" --notes-file .github/RELEASE_NOTES.md
+          fi

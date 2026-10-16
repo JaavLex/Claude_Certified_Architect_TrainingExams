@@ -21,8 +21,9 @@ Loads the two built-in practice exams, every *.json exam in
 and any exam files or folders given as arguments.
 
 OPTIONS:
-    --check    Validate the exam files and exit
-    -h, --help Show this help
+    --check        Validate the exam files and exit
+    -V, --version  Show the version
+    -h, --help     Show this help
 ";
 
 fn main() -> std::io::Result<()> {
@@ -32,6 +33,10 @@ fn main() -> std::io::Result<()> {
         match arg.as_str() {
             "-h" | "--help" => {
                 print!("{}", HELP.replace("{DIR}", &exam::user_exam_dir().display().to_string()));
+                return Ok(());
+            }
+            "-V" | "--version" => {
+                println!("exam-tui {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             "--check" => check = true,

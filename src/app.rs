@@ -1,6 +1,7 @@
 //! Application state and input handling.
 
 use crate::exam::{self, Exam, Question};
+use crate::paths;
 use crate::score;
 use crate::store::{self, Attempt, PracticeRecord};
 use crate::train::{self, PoolItem, QStat};
@@ -146,7 +147,57 @@ pub enum Screen {
     TrainDone(TrainSummary),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MenuItem {
+    Exam(usize),
+    Train,
+    AddExam,
+    SaveExample,
+    History,
+    Quit,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PathAction {
+    AddExam,
+    SaveExample,
+}
+
+/// A one-line path box with a cursor, Tab completion and an inline error.
+pub struct PathInput {
+    pub action: PathAction,
+    pub text: String,
+    /// Cursor position, in characters.
+    pub cursor: usize,
+    pub error: Option<String>,
+    /// Names offered by the last Tab press, when there was more than one.
+    pub matches: Vec<String>,
+}
+
+impl PathInput {
+    fn new(action: PathAction, text: String) -> Self {
+        let cursor = text.chars().count();
+        PathInput { action, text, cursor, error: None, matches: Vec::new() }
+    }
+
+    fn byte_at(&self, char_idx: usize) -> usize {
+        self.text.char_indices().nth(char_idx).map(|(i, _)| i).unwrap_or(self.text.len())
+    }
+
+    pub fn insert(&mut self, s: &str) {
+        // Pasted text may end with a newline; paths never contain one.
+        let s: String = s.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+        let at = self.byte_at(self.cursor);
+        self.text.insert_str(at, &s);
+        self.cursor += s.chars().count();
+        self.error = None;
+        self.matches.clear();
+    }
+}
+
 pub enum Modal {
+    Path(PathInput),
+    Info { title: String, ok: bool, lines: Vec<String> },
     ConfirmSubmit,
     ConfirmAbandon,
     ConfirmDelete,
@@ -185,13 +236,114 @@ impl App {
         }
     }
 
-    /// Menu rows: one per exam, then training, history, quit.
-    pub fn menu_len(&self) -> usize {
-        self.exams.len() + 3
+    /// Menu rows: one per exam, then the tools.
+    pub fn menu_items(&self) -> Vec<MenuItem> {
+        let mut v: Vec<MenuItem> = (0..self.exams.len()).map(MenuItem::Exam).collect();
+        v.extend([MenuItem::Train, MenuItem::AddExam, MenuItem::SaveExample, MenuItem::History, MenuItem::Quit]);
+        v
     }
 
-    pub fn menu_train(&self) -> usize {
-        self.exams.len()
+    pub fn menu_pos(&self, item: MenuItem) -> usize {
+        self.menu_items().iter().position(|&i| i == item).unwrap_or(0)
+    }
+
+    fn open_menu_item(&mut self, item: MenuItem) {
+        match item {
+            MenuItem::Exam(i) => self.screen = Screen::Intro { exam: i },
+            MenuItem::Train => {
+                self.screen = Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
+            }
+            MenuItem::AddExam => self.modal = Some(Modal::Path(PathInput::new(PathAction::AddExam, String::new()))),
+            MenuItem::SaveExample => {
+                let default = exam::default_example_path().display().to_string();
+                self.modal = Some(Modal::Path(PathInput::new(PathAction::SaveExample, default)))
+            }
+            MenuItem::History => self.screen = Screen::History { cursor: 0, filter: None },
+            MenuItem::Quit => self.quit = true,
+        }
+    }
+
+    /// Text pasted into the terminal (bracketed paste).
+    pub fn on_paste(&mut self, text: &str) {
+        if let Some(Modal::Path(p)) = &mut self.modal {
+            p.insert(text);
+        }
+    }
+
+    fn submit_path(&mut self) {
+        let Some(Modal::Path(input)) = &mut self.modal else { return };
+        match input.action {
+            PathAction::AddExam => {
+                let src = match paths::resolve_existing(&input.text) {
+                    Ok(p) => p,
+                    Err(e) => return input.error = Some(e),
+                };
+                let builtin: Vec<String> =
+                    self.exams.iter().filter(|e| e.is_builtin()).map(|e| e.id.clone()).collect();
+                let results = exam::import_path(&src, &builtin);
+                if results.is_empty() {
+                    input.error = Some(format!("No .json files in {}", src.display()));
+                    return;
+                }
+                if let [(_, Err(e))] = results.as_slice() {
+                    // A single file that failed: keep the box open to fix the path.
+                    input.error = Some(format!("Could not add this exam: {e}"));
+                    return;
+                }
+                self.reload();
+                let mut lines = Vec::new();
+                let mut first_id = None;
+                let mut all_ok = true;
+                for (file, r) in &results {
+                    match r {
+                        Ok(im) => {
+                            first_id.get_or_insert(im.id.clone());
+                            let verb = if im.updated { "Updated" } else { "Added" };
+                            lines.push(format!("✓ {verb} “{}”", im.title));
+                        }
+                        Err(e) => {
+                            all_ok = false;
+                            let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                            lines.push(format!("✗ {name}: {e}"));
+                        }
+                    }
+                }
+                lines.push(String::new());
+                match results.as_slice() {
+                    [(_, Ok(im))] => lines.push(format!("Copied to {}", im.dest.display())),
+                    _ => lines.push(format!("Copied to {}", exam::user_exam_dir().display())),
+                }
+                lines.push("It will be there every time you start the app.".into());
+                let cursor = first_id
+                    .and_then(|id| self.exam_index(&id))
+                    .map(|i| self.menu_pos(MenuItem::Exam(i)))
+                    .unwrap_or(0);
+                self.screen = Screen::Menu { cursor };
+                self.modal = Some(Modal::Info { title: "Add exam".into(), ok: all_ok, lines });
+            }
+            PathAction::SaveExample => {
+                let target = match paths::resolve_new(&input.text) {
+                    Ok(p) => p,
+                    Err(e) => return input.error = Some(e),
+                };
+                match exam::save_example(&target) {
+                    Ok(dest) => {
+                        self.modal = Some(Modal::Info {
+                            title: "Example saved".into(),
+                            ok: true,
+                            lines: vec![
+                                "The example exam was saved to:".into(),
+                                dest.display().to_string(),
+                                String::new(),
+                                "Open it in any text editor and replace the questions with".into(),
+                                "your own. Then choose “Add exam from file” to load it.".into(),
+                            ],
+                        })
+                    }
+                    Err(e) => input.error = Some(format!("Could not save: {e}")),
+                }
+            }
+        }
     }
 
     pub fn question_stats(&self) -> std::collections::HashMap<train::Key, QStat> {
@@ -225,7 +377,7 @@ impl App {
     fn finish_training(&mut self) {
         let Screen::Train(t) = std::mem::replace(&mut self.screen, Screen::Menu { cursor: 0 }) else { return };
         if t.results.is_empty() {
-            self.screen = Screen::Menu { cursor: self.menu_train() };
+            self.screen = Screen::Menu { cursor: self.menu_pos(MenuItem::Train) };
             return;
         }
         let st = self.question_stats();
@@ -350,39 +502,40 @@ impl App {
             self.on_modal_key(key);
             return;
         }
+        let items = self.menu_items();
+        let pos_train = self.menu_pos(MenuItem::Train);
         let n_exams = self.exams.len();
-        let menu_len = self.menu_len();
         match &mut self.screen {
-            Screen::Menu { cursor } => match key.code {
-                KeyCode::Up | KeyCode::Char('k') => *cursor = (*cursor + menu_len - 1) % menu_len,
-                KeyCode::Down | KeyCode::Char('j') => *cursor = (*cursor + 1) % menu_len,
-                KeyCode::Char(c @ '1'..='9') => {
-                    let i = (c as u8 - b'1') as usize;
-                    if i < n_exams {
-                        self.screen = Screen::Intro { exam: i }
+            Screen::Menu { cursor } => {
+                let len = items.len();
+                let cur = *cursor;
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => *cursor = (cur + len - 1) % len,
+                    KeyCode::Down | KeyCode::Char('j') => *cursor = (cur + 1) % len,
+                    KeyCode::Char(c @ '1'..='9') => {
+                        let i = (c as u8 - b'1') as usize;
+                        if i < n_exams {
+                            self.open_menu_item(MenuItem::Exam(i))
+                        }
                     }
-                }
-                KeyCode::Char('h') => self.screen = Screen::History { cursor: 0, filter: None },
-                KeyCode::Char('t') => {
-                    self.screen = Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
-                }
-                KeyCode::Char('r') => {
-                    self.reload();
-                    self.screen = Screen::Menu { cursor: 0 };
-                }
-                KeyCode::Char('e') if !self.load_errors.is_empty() => self.modal = Some(Modal::LoadErrors),
-                KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
-                KeyCode::Enter | KeyCode::Char(' ') => match *cursor {
-                    c if c < n_exams => self.screen = Screen::Intro { exam: c },
-                    c if c == n_exams => {
-                        self.screen =
-                            Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
+                    KeyCode::Char('t') => self.open_menu_item(MenuItem::Train),
+                    KeyCode::Char('a') => self.open_menu_item(MenuItem::AddExam),
+                    KeyCode::Char('x') => self.open_menu_item(MenuItem::SaveExample),
+                    KeyCode::Char('h') => self.open_menu_item(MenuItem::History),
+                    KeyCode::Char('r') => {
+                        self.reload();
+                        self.screen = Screen::Menu { cursor: 0 };
                     }
-                    c if c == n_exams + 1 => self.screen = Screen::History { cursor: 0, filter: None },
-                    _ => self.quit = true,
-                },
-                _ => {}
-            },
+                    KeyCode::Char('e') if !self.load_errors.is_empty() => self.modal = Some(Modal::LoadErrors),
+                    KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        if let Some(&item) = items.get(cur) {
+                            self.open_menu_item(item)
+                        }
+                    }
+                    _ => {}
+                }
+            }
             Screen::Intro { exam } => match key.code {
                 KeyCode::Enter => {
                     let n = self.exams[*exam].questions.len();
@@ -449,7 +602,7 @@ impl App {
                     self.screen = Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
                 }
                 KeyCode::Enter | KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
-                    self.screen = Screen::Menu { cursor: n_exams }
+                    self.screen = Screen::Menu { cursor: pos_train }
                 }
                 _ => {}
             },
@@ -457,8 +610,13 @@ impl App {
     }
 
     fn on_modal_key(&mut self, key: KeyEvent) {
+        if matches!(self.modal, Some(Modal::Path(_))) {
+            return self.on_path_key(key);
+        }
         let Some(modal) = &mut self.modal else { return };
         match modal {
+            Modal::Path(_) => {}
+            Modal::Info { .. } => self.modal = None,
             Modal::Goto(buf) => match key.code {
                 KeyCode::Char(c) if c.is_ascii_digit() && buf.len() < 3 => buf.push(c),
                 KeyCode::Backspace => {
@@ -643,6 +801,7 @@ impl App {
         let c = *cursor;
         let rows = self.history_rows(*filter);
         let n_exams = self.exams.len();
+        let pos_history = self.menu_pos(MenuItem::History);
         let Screen::History { cursor, filter } = &mut self.screen else { return };
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => *cursor = cursor.saturating_sub(1),
@@ -681,7 +840,7 @@ impl App {
                 }
             }
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
-                self.screen = Screen::Menu { cursor: n_exams + 1 }
+                self.screen = Screen::Menu { cursor: pos_history }
             }
             _ => {}
         }
@@ -689,6 +848,7 @@ impl App {
 
     fn on_train_setup_key(&mut self, key: KeyEvent) {
         let n_exams = self.exams.len();
+        let pos_train = self.menu_pos(MenuItem::Train);
         let st = self.question_stats();
         let Screen::TrainSetup(t) = &mut self.screen else { return };
         let domains: Vec<String> =
@@ -732,9 +892,53 @@ impl App {
                     step(true, t);
                 }
             }
-            KeyCode::Esc | KeyCode::Char('q') => self.screen = Screen::Menu { cursor: n_exams },
+            KeyCode::Esc | KeyCode::Char('q') => self.screen = Screen::Menu { cursor: pos_train },
             _ => {}
         }
+    }
+
+    fn on_path_key(&mut self, key: KeyEvent) {
+        let Some(Modal::Path(p)) = &mut self.modal else { return };
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let len = p.text.chars().count();
+        match key.code {
+            KeyCode::Enter => return self.submit_path(),
+            KeyCode::Esc => {
+                self.modal = None;
+                return;
+            }
+            KeyCode::Tab => {
+                let (text, matches) = paths::complete(&p.text);
+                p.cursor = text.chars().count();
+                p.text = text;
+                p.matches = matches;
+                p.error = None;
+                return;
+            }
+            KeyCode::Char('u') if ctrl => {
+                p.text.clear();
+                p.cursor = 0;
+            }
+            KeyCode::Char('a') if ctrl => p.cursor = 0,
+            KeyCode::Char('e') if ctrl => p.cursor = len,
+            KeyCode::Char(c) if !ctrl => p.insert(&c.to_string()),
+            KeyCode::Backspace if p.cursor > 0 => {
+                let at = p.byte_at(p.cursor - 1);
+                p.text.remove(at);
+                p.cursor -= 1;
+            }
+            KeyCode::Delete if p.cursor < len => {
+                let at = p.byte_at(p.cursor);
+                p.text.remove(at);
+            }
+            KeyCode::Left => p.cursor = p.cursor.saturating_sub(1),
+            KeyCode::Right => p.cursor = (p.cursor + 1).min(len),
+            KeyCode::Home => p.cursor = 0,
+            KeyCode::End => p.cursor = len,
+            _ => return,
+        }
+        p.error = None;
+        p.matches.clear();
     }
 
     fn on_train_key(&mut self, key: KeyEvent) {

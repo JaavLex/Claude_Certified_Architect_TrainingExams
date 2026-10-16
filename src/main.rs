@@ -1,5 +1,6 @@
 mod app;
 mod exam;
+mod paths;
 mod score;
 mod store;
 mod text;
@@ -57,21 +58,25 @@ fn main() -> std::io::Result<()> {
     }
     let mut app = app::App::new(paths);
     let mut terminal = ratatui::init();
+    // Paste a path in one piece. Not every terminal supports this (the legacy
+    // Windows console does not); pasted text then arrives as key presses.
+    let _ = ratatui::crossterm::execute!(std::io::stdout(), ratatui::crossterm::event::EnableBracketedPaste);
     let result = (|| -> std::io::Result<()> {
         while !app.quit {
             terminal.draw(|f| ui::draw(f, &app))?;
             let wait = if app.animating() { Duration::from_millis(40) } else { Duration::from_millis(250) };
             if event::poll(wait)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        app.on_key(key);
-                    }
+                match event::read()? {
+                    Event::Key(key) if key.kind == KeyEventKind::Press => app.on_key(key),
+                    Event::Paste(text) => app.on_paste(&text),
+                    _ => {}
                 }
             }
             app.tick();
         }
         Ok(())
     })();
+    let _ = ratatui::crossterm::execute!(std::io::stdout(), ratatui::crossterm::event::DisableBracketedPaste);
     ratatui::restore();
     result
 }

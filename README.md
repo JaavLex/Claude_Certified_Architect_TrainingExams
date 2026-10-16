@@ -7,7 +7,7 @@ Built in Rust with [ratatui](https://ratatui.rs). It uses only your terminal's o
 ## Features
 
 - **Two full practice exams.** Pick Practice Exam #1 or #2 from the menu. Each has 60 scenario-based questions.
-- **Custom exams.** Put a `.json` exam file in your exam folder, or pass it on the command line, and it appears in the menu. See [Custom exams](#custom-exams).
+- **Custom exams.** Save the example exam from the menu, edit it, then add it with **Add exam from file**. No rebuilding or command line needed. See [Custom exams](#custom-exams).
 - **Timer.** A progress bar shows the time remaining and drains as time passes. It turns yellow at 25% left, red in the last 10 minutes, and pulses in the last 5 minutes. The exam submits itself when time runs out.
 - **Exam-style answering.** Each question says how many answers to pick ("Select 1" or "Select 2"), and you have to pick exactly that many.
 - **Navigator.** A grid of all 60 questions shows which are answered, incomplete, flagged or unanswered. You can flag questions and jump to any number, or to the next unanswered or flagged one.
@@ -84,6 +84,8 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | | `1`–`9` | Start that exam |
 | | `h` | Attempt history |
 | | `t` | Train weaknesses |
+| | `a` | Add exam from file |
+| | `x` | Save example exam file |
 | | `r` | Reload exam files |
 | | `e` | Show exam files that failed to load |
 | | `q` | Quit |
@@ -102,6 +104,10 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | Review | `↑↓` | Move between questions |
 | | `PgUp` / `PgDn` (`K` / `J`) | Scroll the explanation |
 | | `f` | Switch filter: all / incorrect / correct |
+| Path box | `Tab` | Complete a file or folder name |
+| | `←→`, `Home` / `End` | Move the cursor |
+| | `Ctrl+U` | Clear |
+| | `Enter` / `Esc` | Confirm / cancel |
 | Training setup | `↑↓` | Choose a setting |
 | | `←→` | Change it |
 | | `Enter` | Start |
@@ -125,19 +131,38 @@ Training links results to questions by exam `id` and question `number`. Keep bot
 
 ## Custom exams
 
-Exams are JSON files. The two built-in exams are in [`exams/`](exams/) and are built into the program. You can add your own without rebuilding.
+Exams are JSON files. The two built-in exams are in [`exams/`](exams/) and are built into the program. You can add your own from inside the app, without rebuilding.
 
-### Where to put them
+### Make your own in three steps
 
-The app loads every `*.json` file in your exam folder when it starts:
+1. **Get the template.** On the menu, choose **Save example exam** (`x`). It saves a small example exam to your Downloads folder by default (you can type another file or folder). The example shows every field.
+2. **Edit it** in any text editor: change `id` and `title`, then replace the questions with your own. See [Format](#format) below.
+3. **Add it.** Choose **Add exam from file** (`a`) and give the file's path. The app checks the file, then copies it into your exam folder, so it is in the menu every time you start the app. If something is wrong, it tells you what and where (for example `Q3: "select" is 2 but "answer" has 1 key(s)`), and the box stays open so you can fix the file and press `Enter` again.
+
+To change an exam later, edit your copy and add it again: an exam with the same `id` is updated, not duplicated. You can also give a folder to add every `.json` exam in it. The `id`s of the built-in exams (`exam1`, `exam2`) are reserved.
+
+### Entering a path
+
+The path box works the same way on Linux, macOS and Windows:
+
+- **Drag and drop** the file into the terminal window, or **paste** its path.
+- **Tab** completes file and folder names. If several match, they are listed.
+- `~` means your home folder: `~/Downloads/my-exam.json`. Environment variables also work: `$HOME/…` or `%USERPROFILE%\…`.
+- Paths in quotes, as Windows "Copy as path" gives them (`"C:\Users\me\My Exams\exam.json"`), are fine.
+- Spaces escaped by the macOS or Linux terminal when you drag a file in (`My\ Exams/exam.json`) are fine, as are `file://` links from file managers.
+- Files saved by Notepad (UTF-8 with BOM) or by PowerShell (UTF-16) are read correctly.
+
+### Where exams are stored
+
+Added exams are copied to your exam folder, and every `*.json` file in it is loaded at start:
 
 - Linux: `~/.local/share/exam-tui/exams/`
 - macOS: `~/Library/Application Support/exam-tui/exams/`
 - Windows: `%APPDATA%\exam-tui\exams\`
 
-You can also pass files or folders on the command line: `exam-tui path/to/exam.json`.
+You can also put files there yourself, or pass files or folders on the command line (`exam-tui path/to/exam.json`). Exams passed on the command line are loaded for that run only, not copied. Press `r` on the menu to reload after changing files. Custom exams are marked with ✦ in the menu. A file in the exam folder with the same `id` as a built-in exam replaces it.
 
-Custom exams are marked with ✦ in the menu. Press `r` on the menu to reload after you add or edit a file. A file with the same `id` as another exam replaces it, so you can also override a built-in exam this way.
+To remove a custom exam, delete its file from the exam folder.
 
 ### Format
 
@@ -219,6 +244,7 @@ src/
   exam.rs   loading and checking exam JSON files
   score.rs  scoring and pass/fail
   train.rs  weak-question stats and selection for training
+  paths.rs  reading typed, pasted and dragged paths on every OS
   store.rs  saved attempt history and training log
   text.rs   formatting and line wrapping
 exams/      built-in practice exams (JSON)

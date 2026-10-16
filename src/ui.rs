@@ -1,7 +1,7 @@
 //! Rendering. Only the terminal's own 16-colour palette (named ANSI colours)
 //! and text modifiers are used, so the app follows the user's terminal theme.
 
-use crate::app::{App, Modal, ReviewFilter, Screen, Session, TrainSession, TrainSetup, TrainSummary};
+use crate::app::{App, MenuItem, Modal, PathAction, PathInput, ReviewFilter, Screen, Session, TrainSession, TrainSetup, TrainSummary};
 use crate::train;
 use crate::exam::{Exam, Question};
 use crate::score::{self, CUT_SCORE, SCALE_MAX, SCALE_MIN};
@@ -119,14 +119,19 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     );
 
     let n = app.exams.len();
-    let menu_len = app.menu_len();
-    let body = centered(body, 92, 15);
+    let items = app.menu_items();
+    let body = centered(body, 92, 16);
     let [left, right] = Layout::horizontal([Constraint::Length(34), Constraint::Fill(1)]).spacing(2).areas(body);
 
-    // Menu list: exams, a gap, history, quit. Scrolls if there are many exams.
-    let mut rows: Vec<Option<usize>> = (0..n).map(Some).collect();
-    rows.push(None);
-    rows.extend([Some(n), Some(n + 1), Some(n + 2)]);
+    // Menu list: exams, a gap, training and exam files, a gap, history and quit.
+    // Scrolls if there are many exams.
+    let mut rows: Vec<Option<usize>> = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        if matches!(item, MenuItem::Train | MenuItem::History) {
+            rows.push(None);
+        }
+        rows.push(Some(i));
+    }
     let visible = left.height.saturating_sub(3) as usize;
     let cur_row = rows.iter().position(|r| *r == Some(cursor)).unwrap_or(0);
     let offset = cur_row.saturating_sub(visible.saturating_sub(1));
@@ -136,17 +141,18 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
             lines.push(Line::raw(""));
             continue;
         };
-        let (label, key) = if i < n {
-            let e = &app.exams[i];
-            let tag = if e.is_builtin() { "" } else { " ✦" };
-            let key = if i < 9 { (i + 1).to_string() } else { String::new() };
-            (format!("{}{tag} ", e.short_title()), key)
-        } else if i == n {
-            ("Train weaknesses ".to_string(), "t".to_string())
-        } else if i == n + 1 {
-            ("Attempt history ".to_string(), "h".to_string())
-        } else {
-            ("Quit ".to_string(), "q".to_string())
+        let (label, key) = match items[i] {
+            MenuItem::Exam(ei) => {
+                let e = &app.exams[ei];
+                let tag = if e.is_builtin() { "" } else { " ✦" };
+                let key = if ei < 9 { (ei + 1).to_string() } else { String::new() };
+                (format!("{}{tag} ", e.short_title()), key)
+            }
+            MenuItem::Train => ("Train weaknesses ".to_string(), "t".to_string()),
+            MenuItem::AddExam => ("Add exam from file ".to_string(), "a".to_string()),
+            MenuItem::SaveExample => ("Save example exam ".to_string(), "x".to_string()),
+            MenuItem::History => ("Attempt history ".to_string(), "h".to_string()),
+            MenuItem::Quit => ("Quit ".to_string(), "q".to_string()),
         };
         let width = left.width.saturating_sub(10) as usize;
         let label: String = if label.chars().count() > width {
@@ -246,7 +252,33 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
             }
         }
         v
-    } else if cursor == n + 1 {
+    } else if items.get(cursor) == Some(&MenuItem::AddExam) {
+        let mut v = vec![Line::from("Add your own exam").bold(), Line::raw("")];
+        v.extend(wrap(
+            vec![],
+            vec![Span::raw(
+                "Give the path of an exam .json file (or a folder of them). It is checked, then copied to your exam folder so it is there every time you start the app.",
+            )],
+            w,
+        ));
+        v.push(Line::raw(""));
+        v.push(Line::from("Exam folder").fg(DIM));
+        v.extend(wrap(vec![], vec![Span::styled(crate::exam::user_exam_dir().display().to_string(), Style::new().fg(ACCENT))], w));
+        v
+    } else if items.get(cursor) == Some(&MenuItem::SaveExample) {
+        let mut v = vec![Line::from("Get a template for your own exam").bold(), Line::raw("")];
+        v.extend(wrap(
+            vec![],
+            vec![Span::raw(
+                "Saves a small example exam file that shows every field. Edit it in any text editor, then add it with “Add exam from file”.",
+            )],
+            w,
+        ));
+        v.push(Line::raw(""));
+        v.push(Line::from("Saved by default to").fg(DIM));
+        v.extend(wrap(vec![], vec![Span::styled(crate::exam::default_example_path().display().to_string(), Style::new().fg(ACCENT))], w));
+        v
+    } else if items.get(cursor) == Some(&MenuItem::History) {
         let total = app.attempts.len();
         let passed = app.attempts.iter().filter(|a| a.report.passed).count();
         vec![
@@ -259,10 +291,9 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     } else {
         vec![Line::from("Exit the simulator").fg(DIM)]
     };
-    let _ = menu_len;
     f.render_widget(Paragraph::new(info).wrap(Wrap { trim: false }).block(panel("Details")), right);
 
-    let mut hints = vec![("↑↓", "move"), ("enter", "select"), ("r", "reload exams"), ("q", "quit")];
+    let mut hints = vec![("↑↓", "move"), ("enter", "select"), ("a", "add exam"), ("r", "reload"), ("q", "quit")];
     if !app.load_errors.is_empty() {
         hints.insert(2, ("e", "load errors"));
         let [warn, keys] = Layout::vertical([Constraint::Length(1), Constraint::Length(1)])
@@ -1314,8 +1345,97 @@ fn exam_len(app: &App) -> usize {
     }
 }
 
+fn draw_path_modal(f: &mut Frame, area: Rect, p: &PathInput) {
+    let w = area.width.saturating_sub(4).min(92);
+    let inner = w.saturating_sub(6) as usize;
+    let (title, prompt) = match p.action {
+        PathAction::AddExam => ("Add exam from file", "Path to an exam .json file, or a folder of them:"),
+        PathAction::SaveExample => ("Save example exam", "Save the example to (a file name or a folder):"),
+    };
+
+    // Input line, scrolled horizontally so the cursor stays visible.
+    let chars: Vec<char> = p.text.chars().collect();
+    let field_w = inner.saturating_sub(2).max(10);
+    let start = p.cursor.saturating_sub(field_w.saturating_sub(1));
+    let shown: Vec<char> = chars.iter().skip(start).take(field_w).copied().collect();
+    let rel = p.cursor - start;
+    let before: String = shown.iter().take(rel).collect();
+    let at: String = shown.get(rel).map(|c| c.to_string()).unwrap_or_else(|| " ".into());
+    let after: String = shown.iter().skip(rel + 1).collect();
+    let input = Line::from(vec![
+        Span::styled(if start > 0 { "…" } else { " " }, Style::new().fg(DIM)),
+        Span::styled(before, Style::new().bold()),
+        Span::styled(at, Style::new().add_modifier(Modifier::REVERSED)),
+        Span::styled(after, Style::new().bold()),
+    ]);
+
+    let mut lines = vec![Line::from(prompt).bold(), Line::raw(""), input, Line::from("─".repeat(inner)).fg(ACCENT)];
+    if let Some(err) = &p.error {
+        lines.extend(wrap(vec![Span::styled("⚠ ", Style::new().fg(BAD))], vec![Span::styled(err.clone(), Style::new().fg(BAD))], inner));
+    } else if !p.matches.is_empty() {
+        let list = p.matches.iter().take(12).cloned().collect::<Vec<_>>().join("   ");
+        let more = if p.matches.len() > 12 { format!("   (+{} more)", p.matches.len() - 12) } else { String::new() };
+        lines.extend(wrap(vec![], vec![Span::styled(list + &more, Style::new().fg(ACCENT))], inner));
+    } else {
+        lines.push(Line::raw(""));
+    }
+    lines.push(Line::raw(""));
+    let tip = |t: String| wrap(vec![Span::styled("• ", Style::new().fg(DIM))], vec![Span::styled(t, Style::new().fg(DIM))], inner);
+    if p.action == PathAction::AddExam {
+        lines.extend(tip("Drag the file into this window, or paste its path.".into()));
+    }
+    lines.extend(tip("Tab completes names · ~ is your home folder · Ctrl+U clears".into()));
+    if let Some(home) = dirs::home_dir() {
+        let example = home.join("Downloads").join("my-exam.json");
+        lines.extend(tip(format!("Example: {}", example.display())));
+    }
+    lines.push(Line::raw(""));
+    lines.push(key_hint(&[("enter", if p.action == PathAction::AddExam { "add" } else { "save" }), ("tab", "complete"), ("esc", "cancel")]));
+
+    let h = (lines.len() as u16 + 4).min(area.height);
+    let r = centered(area, w, h);
+    f.render_widget(Clear, r);
+    f.render_widget(
+        Paragraph::new(lines).block(panel(title).border_style(Style::new().fg(ACCENT)).padding(Padding::uniform(1))),
+        r,
+    );
+}
+
+fn draw_info_modal(f: &mut Frame, area: Rect, title: &str, ok: bool, body: &[String]) {
+    let w = area.width.saturating_sub(4).min(92);
+    let inner = w.saturating_sub(6) as usize;
+    let mut lines = Vec::new();
+    for l in body {
+        let style = if l.starts_with('✓') {
+            Style::new().fg(GOOD)
+        } else if l.starts_with('✗') {
+            Style::new().fg(BAD)
+        } else {
+            Style::new()
+        };
+        if l.is_empty() {
+            lines.push(Line::raw(""));
+        } else {
+            lines.extend(wrap(vec![], vec![Span::styled(l.clone(), style)], inner));
+        }
+    }
+    lines.push(Line::raw(""));
+    lines.push(Line::from("press any key").fg(DIM).alignment(Alignment::Center));
+    let h = (lines.len() as u16 + 4).min(area.height);
+    let r = centered(area, w, h);
+    f.render_widget(Clear, r);
+    f.render_widget(
+        Paragraph::new(lines).block(
+            panel(title).border_style(Style::new().fg(if ok { GOOD } else { WARN })).padding(Padding::uniform(1)),
+        ),
+        r,
+    );
+}
+
 fn draw_modal(f: &mut Frame, area: Rect, app: &App, m: &Modal) {
     let (title, body): (&str, Vec<Line>) = match m {
+        Modal::Path(p) => return draw_path_modal(f, area, p),
+        Modal::Info { title, ok, lines } => return draw_info_modal(f, area, title, *ok, lines),
         Modal::ConfirmSubmit => {
             let mut v = vec![Line::from("Submit your exam for scoring?").bold(), Line::raw("")];
             if let Screen::Exam(s) = &app.screen {

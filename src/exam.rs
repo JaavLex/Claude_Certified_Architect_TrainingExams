@@ -214,9 +214,7 @@ pub fn load_all(extra: &[PathBuf]) -> Loaded {
 
     for path in files {
         let shown = path.display().to_string();
-        let result = std::fs::read_to_string(&path)
-            .map_err(|e| e.to_string())
-            .and_then(|s| parse(&s, &shown));
+        let result = crate::paths::read_text(&path).and_then(|s| parse(&s, &shown));
         match result {
             Ok(e) => match out.exams.iter().position(|x| x.id == e.id) {
                 Some(i) => out.exams[i] = e,
@@ -226,6 +224,98 @@ pub fn load_all(extra: &[PathBuf]) -> Loaded {
         }
     }
     out
+}
+
+/// The example exam, offered to users as a starting point for their own.
+const EXAMPLE_JSON: &str = include_str!("../examples/custom-exam.json");
+const SCHEMA_URL: &str =
+    "https://raw.githubusercontent.com/JaavLex/Claude_Certified_Architect_TrainingExams/main/schema/exam.schema.json";
+
+pub struct Imported {
+    pub id: String,
+    pub title: String,
+    pub dest: PathBuf,
+    /// True when an exam with the same id was already in the exam folder.
+    pub updated: bool,
+}
+
+/// Check an exam file and copy it into the user exam folder so it is loaded
+/// on every start. An exam already there with the same id is replaced.
+pub fn import_file(src: &Path, builtin_ids: &[String]) -> Result<Imported, String> {
+    let text = crate::paths::read_text(src)?;
+    let exam = parse(&text, &src.display().to_string())?;
+    if builtin_ids.contains(&exam.id) {
+        return Err(format!(
+            "its id \"{}\" is used by a built-in exam. Change \"id\" in the file to something else.",
+            exam.id
+        ));
+    }
+    let dir = user_exam_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+
+    let same_file = |a: &Path, b: &Path| match (a.canonicalize(), b.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    };
+    // Reuse the file of an exam with the same id, so it is replaced, not duplicated.
+    let existing = json_files_in(&dir).into_iter().find(|p| {
+        crate::paths::read_text(p)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .is_some_and(|v| v["id"].as_str() == Some(exam.id.as_str()))
+    });
+    let updated = existing.is_some();
+    let dest = existing
+        .unwrap_or_else(|| crate::paths::unique_path(&dir, &crate::paths::safe_stem(&exam.id), "json"));
+    if !same_file(src, &dest) {
+        // Write as UTF-8 without BOM, via a temporary file so a failure never
+        // leaves a half-written exam behind.
+        let tmp = dest.with_extension("json.tmp");
+        std::fs::write(&tmp, text.as_bytes()).map_err(|e| format!("cannot write {}: {e}", tmp.display()))?;
+        std::fs::rename(&tmp, &dest).map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
+    }
+    Ok(Imported { id: exam.id, title: exam.title, dest, updated })
+}
+
+/// Import a file, or every `.json` file in a folder.
+pub fn import_path(src: &Path, builtin_ids: &[String]) -> Vec<(PathBuf, Result<Imported, String>)> {
+    let files = if src.is_dir() { json_files_in(src) } else { vec![src.to_path_buf()] };
+    files.into_iter().map(|f| (f.clone(), import_file(&f, builtin_ids))).collect()
+}
+
+/// Where the example is saved by default: the Downloads folder, else home.
+pub fn default_example_path() -> PathBuf {
+    let dir = dirs::download_dir()
+        .filter(|d| d.is_dir())
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("."));
+    crate::paths::unique_path(&dir, "exam-tui-example", "json")
+}
+
+/// Write the example exam to `target` (a file path, or a folder to put it in).
+/// Never overwrites an existing file.
+pub fn save_example(target: &Path) -> Result<PathBuf, String> {
+    let dest = if target.is_dir() {
+        crate::paths::unique_path(target, "exam-tui-example", "json")
+    } else if target.extension().is_none() {
+        target.with_extension("json")
+    } else {
+        target.to_path_buf()
+    };
+    if dest.exists() {
+        return Err(format!("{} already exists. Choose another name.", dest.display()));
+    }
+    match dest.parent() {
+        Some(d) if !d.as_os_str().is_empty() && !d.is_dir() => {
+            return Err(format!("the folder {} does not exist.", d.display()));
+        }
+        _ => {}
+    }
+    // Point "$schema" at the published schema so editors can check the file
+    // wherever it is saved.
+    let json = EXAMPLE_JSON.replace("\"../schema/exam.schema.json\"", &format!("\"{SCHEMA_URL}\""));
+    std::fs::write(&dest, json).map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
+    Ok(dest)
 }
 
 fn json_files_in(dir: &Path) -> Vec<PathBuf> {
@@ -263,6 +353,22 @@ mod tests {
     fn example_exam_is_valid() {
         let json = std::fs::read_to_string("examples/custom-exam.json").unwrap();
         parse(&json, "example").unwrap();
+    }
+
+    #[test]
+    fn example_round_trip() {
+        let dir = std::env::temp_dir().join(format!("exam-tui-example-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let saved = save_example(&dir).unwrap();
+        assert_eq!(saved.file_name().unwrap(), "exam-tui-example.json");
+        let text = std::fs::read_to_string(&saved).unwrap();
+        assert!(text.contains(SCHEMA_URL));
+        parse(&text, "saved").unwrap();
+        // Never overwrites; a folder gets a fresh name.
+        assert!(save_example(&saved).is_err());
+        assert_eq!(save_example(&dir).unwrap().file_name().unwrap(), "exam-tui-example-2.json");
+        assert!(save_example(&dir.join("missing").join("x.json")).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

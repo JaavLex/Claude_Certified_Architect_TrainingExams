@@ -185,6 +185,14 @@ pub fn user_exam_dir() -> PathBuf {
     dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("exam-tui").join("exams")
 }
 
+/// Create the exam folder if it does not exist yet (e.g. on first run of a
+/// downloaded executable), so the path shown to the user is a real folder.
+pub fn ensure_user_exam_dir() -> Result<PathBuf, String> {
+    let dir = user_exam_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
 pub struct Loaded {
     pub exams: Vec<Exam>,
     /// Files that could not be loaded, with the reason.

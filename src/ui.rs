@@ -262,8 +262,15 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
             w,
         ));
         v.push(Line::raw(""));
-        v.push(Line::from("Exam folder").fg(DIM));
+        v.push(Line::from("Your exam folder (created automatically)").fg(DIM));
         v.extend(wrap(vec![], vec![Span::styled(crate::exam::user_exam_dir().display().to_string(), Style::new().fg(ACCENT))], w));
+        match &app.exam_dir_error {
+            Some(e) => v.extend(wrap(vec![Span::styled("⚠ ", Style::new().fg(BAD))], vec![Span::styled(e.clone(), Style::new().fg(BAD))], w)),
+            None => v.push(Line::from(vec![
+                Span::styled("o", Style::new().fg(ACCENT).bold()),
+                Span::styled(" opens it in your file manager", Style::new().fg(DIM)),
+            ])),
+        }
         v
     } else if items.get(cursor) == Some(&MenuItem::SaveExample) {
         let mut v = vec![Line::from("Get a template for your own exam").bold(), Line::raw("")];
@@ -293,7 +300,7 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     };
     f.render_widget(Paragraph::new(info).wrap(Wrap { trim: false }).block(panel("Details")), right);
 
-    let mut hints = vec![("↑↓", "move"), ("enter", "select"), ("a", "add exam"), ("r", "reload"), ("q", "quit")];
+    let mut hints = vec![("↑↓", "move"), ("enter", "select"), ("a", "add exam"), ("o", "exam folder"), ("r", "reload"), ("q", "quit")];
     if !app.load_errors.is_empty() {
         hints.insert(2, ("e", "load errors"));
         let [warn, keys] = Layout::vertical([Constraint::Length(1), Constraint::Length(1)])

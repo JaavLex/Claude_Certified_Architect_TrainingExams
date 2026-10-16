@@ -86,6 +86,7 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | | `t` | Train weaknesses |
 | | `a` | Add exam from file |
 | | `x` | Save example exam file |
+| | `o` | Open your exam folder in the file manager |
 | | `r` | Reload exam files |
 | | `e` | Show exam files that failed to load |
 | | `q` | Quit |
@@ -154,7 +155,7 @@ The path box works the same way on Linux, macOS and Windows:
 
 ### Where exams are stored
 
-Added exams are copied to your exam folder, and every `*.json` file in it is loaded at start:
+Added exams are copied to your exam folder, and every `*.json` file in it is loaded at start. The app creates this folder the first time it runs, so there is nothing to set up after downloading it. Press `o` on the menu to open it in your file manager (Explorer, Finder, or your Linux desktop's default):
 
 - Linux: `~/.local/share/exam-tui/exams/`
 - macOS: `~/Library/Application Support/exam-tui/exams/`
@@ -162,7 +163,7 @@ Added exams are copied to your exam folder, and every `*.json` file in it is loa
 
 You can also put files there yourself, or pass files or folders on the command line (`exam-tui path/to/exam.json`). Exams passed on the command line are loaded for that run only, not copied. Press `r` on the menu to reload after changing files. Custom exams are marked with ✦ in the menu. A file in the exam folder with the same `id` as a built-in exam replaces it.
 
-To remove a custom exam, delete its file from the exam folder.
+To remove a custom exam, press `o` to open the exam folder, delete its file, then press `r` to reload.
 
 ### Format
 

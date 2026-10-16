@@ -216,12 +216,15 @@ pub struct App {
     pub save_error: Option<String>,
     /// Exam files that failed to load, with reasons.
     pub load_errors: Vec<String>,
+    /// Set when the exam folder could not be created at start.
+    pub exam_dir_error: Option<String>,
     /// Extra exam paths given on the command line (kept for reloading).
     extra_paths: Vec<PathBuf>,
 }
 
 impl App {
     pub fn new(extra_paths: Vec<PathBuf>) -> Self {
+        let exam_dir_error = exam::ensure_user_exam_dir().err();
         let loaded = exam::load_all(&extra_paths);
         App {
             exams: loaded.exams,
@@ -232,7 +235,24 @@ impl App {
             quit: false,
             save_error: None,
             load_errors: loaded.errors,
+            exam_dir_error,
             extra_paths,
+        }
+    }
+
+    fn open_exam_folder(&mut self) {
+        let dir = exam::user_exam_dir();
+        if let Err(e) = paths::open_in_file_manager(&dir) {
+            self.modal = Some(Modal::Info {
+                title: "Exam folder".into(),
+                ok: false,
+                lines: vec![
+                    format!("✗ {e}"),
+                    String::new(),
+                    "You can open it yourself; it is at:".into(),
+                    dir.display().to_string(),
+                ],
+            });
         }
     }
 
@@ -314,6 +334,7 @@ impl App {
                     _ => lines.push(format!("Copied to {}", exam::user_exam_dir().display())),
                 }
                 lines.push("It will be there every time you start the app.".into());
+                lines.push("Press o on the menu to open this folder.".into());
                 let cursor = first_id
                     .and_then(|id| self.exam_index(&id))
                     .map(|i| self.menu_pos(MenuItem::Exam(i)))
@@ -521,6 +542,7 @@ impl App {
                     KeyCode::Char('t') => self.open_menu_item(MenuItem::Train),
                     KeyCode::Char('a') => self.open_menu_item(MenuItem::AddExam),
                     KeyCode::Char('x') => self.open_menu_item(MenuItem::SaveExample),
+                    KeyCode::Char('o') => self.open_exam_folder(),
                     KeyCode::Char('h') => self.open_menu_item(MenuItem::History),
                     KeyCode::Char('r') => {
                         self.reload();

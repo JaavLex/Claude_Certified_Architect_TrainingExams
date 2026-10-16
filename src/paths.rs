@@ -165,6 +165,33 @@ fn unescape_shell(s: &str) -> String {
     out
 }
 
+/// Open `dir` in the system file manager (Explorer, Finder, or the desktop's
+/// default via `xdg-open`), creating it first if needed.
+pub fn open_in_file_manager(dir: &Path) -> Result<(), String> {
+    use std::process::{Command, Stdio};
+    std::fs::create_dir_all(dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    // Silence the helper so its messages do not draw over the interface.
+    let mut child = Command::new(program)
+        .arg(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("could not start a file manager ({program}: {e})"))?;
+    // Reap the helper when it exits instead of leaving it waiting.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
+
 /// Read a text file, accepting UTF-8 (with or without BOM) and UTF-16 with BOM.
 /// Notepad and PowerShell on Windows commonly write the latter two.
 pub fn read_text(path: &Path) -> Result<String, String> {

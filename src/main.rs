@@ -3,6 +3,7 @@ mod exam;
 mod score;
 mod store;
 mod text;
+mod train;
 mod ui;
 
 use ratatui::crossterm::event::{self, Event, KeyEventKind};

@@ -1,7 +1,8 @@
 //! Rendering. Only the terminal's own 16-colour palette (named ANSI colours)
 //! and text modifiers are used, so the app follows the user's terminal theme.
 
-use crate::app::{App, Modal, ReviewFilter, Screen, Session};
+use crate::app::{App, Modal, ReviewFilter, Screen, Session, TrainSession, TrainSetup, TrainSummary};
+use crate::train;
 use crate::exam::{Exam, Question};
 use crate::score::{self, CUT_SCORE, SCALE_MAX, SCALE_MIN};
 use crate::store::Attempt;
@@ -77,6 +78,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             draw_review(f, area, app, *attempt, *filter, *cursor, *scroll)
         }
         Screen::History { cursor, filter } => draw_history(f, area, app, *cursor, *filter),
+        Screen::TrainSetup(t) => draw_train_setup(f, area, app, t),
+        Screen::Train(t) => draw_train(f, area, app, t),
+        Screen::TrainDone(t) => draw_train_done(f, area, app, t),
     }
     if let Some(m) = &app.modal {
         draw_modal(f, area, app, m);
@@ -122,7 +126,7 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
     // Menu list: exams, a gap, history, quit. Scrolls if there are many exams.
     let mut rows: Vec<Option<usize>> = (0..n).map(Some).collect();
     rows.push(None);
-    rows.extend([Some(n), Some(n + 1)]);
+    rows.extend([Some(n), Some(n + 1), Some(n + 2)]);
     let visible = left.height.saturating_sub(3) as usize;
     let cur_row = rows.iter().position(|r| *r == Some(cursor)).unwrap_or(0);
     let offset = cur_row.saturating_sub(visible.saturating_sub(1));
@@ -138,6 +142,8 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
             let key = if i < 9 { (i + 1).to_string() } else { String::new() };
             (format!("{}{tag} ", e.short_title()), key)
         } else if i == n {
+            ("Train weaknesses ".to_string(), "t".to_string())
+        } else if i == n + 1 {
             ("Attempt history ".to_string(), "h".to_string())
         } else {
             ("Quit ".to_string(), "q".to_string())
@@ -212,6 +218,35 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
         }
         v
     } else if cursor == n {
+        let st = app.question_stats();
+        let weak = train::weak_domains(&app.exams, &st, None);
+        let total: usize = weak.iter().map(|(_, c)| c).sum();
+        let mut v = vec![
+            Line::from("Practise the questions you get wrong").bold(),
+            Line::from(format!(
+                "A question stays here until you answer it right {}× in a row.",
+                train::MASTERY_STREAK
+            ))
+            .fg(DIM),
+            Line::raw(""),
+        ];
+        if total == 0 {
+            v.push(Line::from("No weak questions yet — take an exam first.").fg(DIM).italic());
+        } else {
+            v.push(Line::from(vec![
+                Span::styled(format!("{total}"), Style::new().fg(WARN).bold()),
+                Span::raw(" weak question(s)"),
+            ]));
+            v.push(Line::raw(""));
+            for (d, c) in weak.iter().take(6) {
+                v.push(Line::from(vec![
+                    Span::styled(format!("{d:<5}"), Style::new().fg(ACCENT).bold()),
+                    Span::styled(format!("{c:>3}"), Style::new().bold()),
+                ]));
+            }
+        }
+        v
+    } else if cursor == n + 1 {
         let total = app.attempts.len();
         let passed = app.attempts.iter().filter(|a| a.report.passed).count();
         vec![
@@ -379,33 +414,7 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
     lines.extend(wrap(vec![], md_spans(&q.text, Style::new().bold()), inner_w));
     lines.push(Line::raw(""));
 
-    let mut cursor_line = (0, 0);
-    for (i, crate::exam::ExamOption { key: letter, text }) in q.options.iter().enumerate() {
-        let picked = chosen.contains(letter);
-        let at = i == s.cursor;
-        let mark = match (q.select == 1, picked) {
-            (true, true) => "◉",
-            (true, false) => "○",
-            (false, true) => "▣",
-            (false, false) => "□",
-        };
-        let base = if picked { Style::new().fg(GOOD) } else { Style::new() };
-        let base = if at { base.bold() } else { base };
-        let prefix = vec![
-            Span::styled(if at { " ▌" } else { "  " }, Style::new().fg(ACCENT)),
-            Span::styled(format!("{mark} "), if picked { Style::new().fg(GOOD) } else { Style::new().fg(DIM) }),
-            Span::styled(
-                format!("{letter}. "),
-                if at { Style::new().fg(ACCENT).bold() } else { Style::new().fg(DIM) },
-            ),
-        ];
-        let start = lines.len();
-        lines.extend(wrap(prefix, md_spans(text, base), inner_w));
-        if at {
-            cursor_line = (start, lines.len());
-        }
-        lines.push(Line::raw(""));
-    }
+    let cursor_line = push_options(&mut lines, q, chosen, s.cursor, inner_w);
     if let Some(n) = s.notice() {
         lines.push(Line::from(format!("  ⚠ {n}")).fg(WARN));
     }
@@ -435,6 +444,44 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
         &[("↑↓", "option"), ("spc", "select"), ("←→", "nav"), ("f", "flag"), ("g", "goto"), ("s", "submit")]
     };
     f.render_widget(key_hint(hints), foot);
+}
+
+/// Append selectable options; returns the line range of the highlighted one.
+fn push_options(
+    lines: &mut Vec<Line<'static>>,
+    q: &Question,
+    chosen: &[char],
+    cursor: usize,
+    w: usize,
+) -> (usize, usize) {
+    let mut cursor_line = (0, 0);
+    for (i, crate::exam::ExamOption { key: letter, text }) in q.options.iter().enumerate() {
+        let picked = chosen.contains(letter);
+        let at = i == cursor;
+        let mark = match (q.select == 1, picked) {
+            (true, true) => "◉",
+            (true, false) => "○",
+            (false, true) => "▣",
+            (false, false) => "□",
+        };
+        let base = if picked { Style::new().fg(GOOD) } else { Style::new() };
+        let base = if at { base.bold() } else { base };
+        let prefix = vec![
+            Span::styled(if at { " ▌" } else { "  " }, Style::new().fg(ACCENT)),
+            Span::styled(format!("{mark} "), if picked { Style::new().fg(GOOD) } else { Style::new().fg(DIM) }),
+            Span::styled(
+                format!("{letter}. "),
+                if at { Style::new().fg(ACCENT).bold() } else { Style::new().fg(DIM) },
+            ),
+        ];
+        let start = lines.len();
+        lines.extend(wrap(prefix, md_spans(text, base), w));
+        if at {
+            cursor_line = (start, lines.len());
+        }
+        lines.push(Line::raw(""));
+    }
+    cursor_line
 }
 
 fn short_scenario(s: &str) -> String {
@@ -781,6 +828,22 @@ fn draw_review(
     d.push(Line::raw(""));
     d.extend(wrap(vec![], md_spans(&q.text, Style::new().bold()), w));
     d.push(Line::raw(""));
+    d.extend(answer_breakdown(q, chosen, w));
+
+    let max_scroll = (d.len() as u16).saturating_sub(detail.height.saturating_sub(2));
+    f.render_widget(Paragraph::new(d).scroll((scroll.min(max_scroll), 0)).block(panel("Detail")), detail);
+
+    f.render_widget(
+        key_hint(&[("↑↓", "question"), ("pgup/pgdn", "scroll"), ("f", "filter all/incorrect/correct"), ("esc", "back")]),
+        foot,
+    );
+}
+
+/// Options marked right/wrong, your vs the correct answer, and the explanation.
+/// Shared by the review and training screens.
+fn answer_breakdown(q: &Question, chosen: &[char], w: usize) -> Vec<Line<'static>> {
+    let ok = q.is_correct(chosen);
+    let mut d: Vec<Line<'static>> = Vec::new();
     for crate::exam::ExamOption { key: letter, text } in &q.options {
         let right = q.answer.contains(letter);
         let picked = chosen.contains(letter);
@@ -835,14 +898,7 @@ fn draw_review(
             d.push(Line::from(format!("You missed: {}", fmt(&missed))).fg(WARN));
         }
     }
-
-    let max_scroll = (d.len() as u16).saturating_sub(detail.height.saturating_sub(2));
-    f.render_widget(Paragraph::new(d).scroll((scroll.min(max_scroll), 0)).block(panel("Detail")), detail);
-
-    f.render_widget(
-        key_hint(&[("↑↓", "question"), ("pgup/pgdn", "scroll"), ("f", "filter all/incorrect/correct"), ("esc", "back")]),
-        foot,
-    );
+    d
 }
 
 // ───────────────────────────── History ─────────────────────────────
@@ -1014,6 +1070,241 @@ fn draw_history(f: &mut Frame, area: Rect, app: &App, cursor: usize, filter: Opt
     );
 }
 
+// ───────────────────────────── Training ─────────────────────────────
+
+fn draw_train_setup(f: &mut Frame, area: Rect, app: &App, t: &TrainSetup) {
+    let st = app.question_stats();
+    let pool = train::weak_pool(&app.exams, &st, t.exam, t.domain.as_deref());
+    let size = train::SIZES[t.size];
+    let n_session = if size == 0 { pool.len() } else { size.min(pool.len()) };
+
+    let box_ = centered(area, 78, 24);
+    let w = box_.width.saturating_sub(6) as usize;
+    let mut lines = vec![Line::from("Train your weak questions").bold().fg(ACCENT), Line::raw("")];
+    lines.extend(wrap(
+        vec![],
+        vec![Span::styled(
+            format!(
+                "Questions you answered wrong in an exam or in training. One leaves the list after you answer it right {}× in a row. Each answer is checked straight away, with the explanation.",
+                train::MASTERY_STREAK
+            ),
+            Style::new().fg(DIM),
+        )],
+        w,
+    ));
+    lines.push(Line::raw(""));
+
+    let exam_label = t.exam.map(|i| app.exams[i].short_title()).unwrap_or_else(|| "All exams".into());
+    let domain_label = match &t.domain {
+        None => "All domains".to_string(),
+        Some(d) => {
+            let name = match t.exam {
+                Some(i) => app.exams[i].domain_name(d),
+                None => app.exams.iter().map(|e| e.domain_name(d)).find(|n| n != d).unwrap_or_else(|| d.clone()),
+            };
+            if name == *d { d.clone() } else { format!("{d} · {name}") }
+        }
+    };
+    let size_label = if size == 0 { "All".to_string() } else { size.to_string() };
+    let row = |idx: usize, label: &str, value: String| {
+        let at = t.field == idx;
+        Line::from(vec![
+            Span::styled(if at { " ▌ " } else { "   " }, Style::new().fg(ACCENT)),
+            Span::styled(format!("{label:<11}"), Style::new().fg(DIM)),
+            Span::styled("‹ ", Style::new().fg(if at { ACCENT } else { DIM })),
+            Span::styled(value, if at { Style::new().fg(ACCENT).bold() } else { Style::new().bold() }),
+            Span::styled(" ›", Style::new().fg(if at { ACCENT } else { DIM })),
+        ])
+    };
+    lines.push(row(0, "Exam", exam_label));
+    lines.push(row(1, "Domain", domain_label));
+    lines.push(row(2, "Questions", size_label));
+    lines.push(Line::raw(""));
+    let start_style = if pool.is_empty() {
+        Style::new().fg(DIM)
+    } else if t.field == 3 {
+        Style::new().fg(Color::Black).bg(ACCENT).bold()
+    } else {
+        Style::new().fg(ACCENT).bold()
+    };
+    let start_label = if pool.is_empty() {
+        "  nothing to train  ".to_string()
+    } else {
+        format!("  Start · {n_session} question(s)  ")
+    };
+    lines.push(Line::from(Span::styled(start_label, start_style)).alignment(Alignment::Center));
+    lines.push(Line::raw(""));
+
+    if pool.is_empty() {
+        let msg = if st.values().any(|s| s.is_weak()) {
+            "No weak questions match these filters."
+        } else {
+            "No weak questions yet. Take an exam: every question you miss shows up here."
+        };
+        lines.push(Line::from(msg).fg(DIM).italic().alignment(Alignment::Center));
+    } else {
+        lines.push(Line::from("Weak questions by domain").fg(DIM));
+        let doms = train::weak_domains(&app.exams, &st, t.exam);
+        let max = doms.iter().map(|(_, c)| *c).max().unwrap_or(1);
+        for (d, c) in doms {
+            let sel = t.domain.as_deref() == Some(d.as_str());
+            let m = if sel { Modifier::BOLD | Modifier::REVERSED } else { Modifier::BOLD };
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {d:<5}"), Style::new().fg(ACCENT).add_modifier(m)),
+                Span::styled(format!("{c:>3} "), Style::new().bold()),
+                Span::styled("█".repeat((c * 24).div_ceil(max)), Style::new().fg(WARN)),
+            ]));
+        }
+    }
+    f.render_widget(Paragraph::new(lines).block(panel("Train weaknesses").padding(Padding::uniform(1))), box_);
+
+    let [_, foot] = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
+    f.render_widget(
+        key_hint(&[("↑↓", "choose setting"), ("←→", "change"), ("enter", "start"), ("esc", "back")]),
+        foot,
+    );
+}
+
+fn draw_train(f: &mut Frame, area: Rect, app: &App, t: &TrainSession) {
+    let item = &t.items[t.current];
+    let e = &app.exams[item.exam];
+    let q = &e.questions[item.q];
+    let right = t.results.iter().filter(|&&r| r).count();
+    let wrong = t.results.len() - right;
+
+    let [header, progress, body, foot] =
+        Layout::vertical([Constraint::Length(1), Constraint::Length(3), Constraint::Fill(1), Constraint::Length(1)])
+            .areas(area);
+
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(" Training ", Style::new().fg(ACCENT).bold()),
+            Span::styled("│ ", Style::new().fg(DIM)),
+            Span::styled(format!("Question {}/{}", t.current + 1, t.items.len()), Style::new().bold()),
+            Span::styled("  │  ", Style::new().fg(DIM)),
+            Span::styled(format!("✓ {right}"), Style::new().fg(GOOD).bold()),
+            Span::raw("  "),
+            Span::styled(format!("✗ {wrong}"), Style::new().fg(BAD).bold()),
+            Span::styled("  │  no time limit", Style::new().fg(DIM)),
+        ])),
+        header,
+    );
+
+    let done = t.results.len();
+    let gauge = Gauge::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::new().fg(DIM))
+                .title(Line::from(" Progress ").fg(ACCENT).bold()),
+        )
+        .gauge_style(Style::new().fg(ACCENT))
+        .ratio(done as f64 / t.items.len().max(1) as f64)
+        .use_unicode(true)
+        .label(Span::styled(format!("{done} of {} checked", t.items.len()), Style::new().bold()));
+    f.render_widget(gauge, progress);
+
+    let w = body.width.saturating_sub(4) as usize;
+    let mut lines: Vec<Line> = Vec::new();
+    let before = item.stat;
+    lines.push(Line::from(vec![
+        Span::styled(format!(" Q{} ", q.number), Style::new().fg(Color::Black).bg(ACCENT).bold()),
+        Span::raw(" "),
+        Span::styled(
+            format!(" Select {} ", q.select),
+            if q.select > 1 { Style::new().fg(Color::Black).bg(WARN).bold() } else { Style::new() },
+        ),
+        Span::styled(format!("  {} · {}", e.short_title(), q.domain), Style::new().fg(DIM)),
+        Span::styled(format!("  ·  missed {} of {} time(s)", before.wrong, before.seen), Style::new().fg(WARN)),
+    ]));
+    lines.push(Line::raw(""));
+    lines.extend(wrap(vec![], md_spans(&q.text, Style::new().bold()), w));
+    lines.push(Line::raw(""));
+
+    let inner_h = body.height.saturating_sub(2) as usize;
+    
+    let scroll = if t.revealed {
+        let ok = t.results.last().copied().unwrap_or(false);
+        lines.push(Line::from(if ok {
+            Span::styled(" ✓ CORRECT ", Style::new().fg(Color::Black).bg(GOOD).bold())
+        } else {
+            Span::styled(" ✗ INCORRECT ", Style::new().fg(Color::Black).bg(BAD).bold())
+        }));
+        lines.push(Line::raw(""));
+        lines.extend(answer_breakdown(q, &t.chosen, w));
+        lines.push(Line::raw(""));
+        if let Some(after) = t.after {
+            lines.push(if !after.is_weak() {
+                Line::from("★ Mastered — removed from your weak questions").fg(GOOD).bold()
+            } else if ok {
+                Line::from(format!(
+                    "{}/{} correct in a row — get it right once more to master it",
+                    after.streak,
+                    train::MASTERY_STREAK
+                ))
+                .fg(WARN)
+            } else {
+                Line::from(format!(
+                    "Still weak — missed {} of {} time(s). It will come back in a later session.",
+                    after.wrong, after.seen
+                ))
+                .fg(BAD)
+            });
+        }
+        t.scroll.min((lines.len().saturating_sub(inner_h)) as u16)
+    } else {
+        let cursor_line = push_options(&mut lines, q, &t.chosen, t.cursor, w);
+        if let Some(n) = t.notice() {
+            lines.push(Line::from(format!("  ⚠ {n}")).fg(WARN));
+        }
+        cursor_line.1.saturating_sub(inner_h) as u16
+    };
+    let title = if q.scenario.is_empty() { e.short_title() } else { short_scenario(&q.scenario) };
+    f.render_widget(Paragraph::new(lines).scroll((scroll, 0)).block(panel(title)), body);
+
+    let hints: &[(&str, &str)] = if t.revealed {
+        &[("enter", "next"), ("↑↓", "scroll"), ("esc", "end session")]
+    } else if q.select == 1 {
+        &[("↑↓", "option"), ("a-e/1-9", "select"), ("enter", "check"), ("esc", "end session")]
+    } else {
+        &[("↑↓", "option"), ("spc/a-e/1-9", "select"), ("enter", "check"), ("esc", "end session")]
+    };
+    f.render_widget(key_hint(hints), foot);
+}
+
+fn draw_train_done(f: &mut Frame, area: Rect, app: &App, t: &TrainSummary) {
+    let right = t.results.iter().filter(|&&r| r).count();
+    let total = t.results.len();
+    let box_ = centered(area, 72, (total as u16 + 10).min(area.height.saturating_sub(1)));
+    let mut lines = vec![
+        Line::from("Training session complete").bold().fg(ACCENT),
+        Line::raw(""),
+        Line::from(vec![
+            Span::styled(format!("{right}/{total}"), Style::new().fg(if right * 2 >= total { GOOD } else { BAD }).bold()),
+            Span::styled(" correct   ", Style::new().fg(DIM)),
+            Span::styled(format!("{}", t.mastered), Style::new().fg(GOOD).bold()),
+            Span::styled(" mastered   ", Style::new().fg(DIM)),
+            Span::styled(format!("{}", t.remaining), Style::new().fg(WARN).bold()),
+            Span::styled(" weak question(s) left", Style::new().fg(DIM)),
+        ]),
+        Line::raw(""),
+    ];
+    for (item, ok) in t.items.iter().zip(&t.results) {
+        let e = &app.exams[item.exam];
+        let q = &e.questions[item.q];
+        lines.push(Line::from(vec![
+            if *ok { Span::styled(" ✓ ", Style::new().fg(GOOD)) } else { Span::styled(" ✗ ", Style::new().fg(BAD)) },
+            Span::styled(format!("Q{:<3} ", q.number), Style::new().bold()),
+            Span::styled(format!("{:<7}", q.domain), Style::new().fg(ACCENT)),
+            Span::styled(e.short_title(), Style::new().fg(DIM)),
+        ]));
+    }
+    f.render_widget(Paragraph::new(lines).block(panel("Summary").padding(Padding::uniform(1))), box_);
+    let [_, foot] = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
+    f.render_widget(key_hint(&[("t", "train again"), ("enter", "menu")]), foot);
+}
+
 // ───────────────────────────── Modals ─────────────────────────────
 
 fn exam_len(app: &App) -> usize {
@@ -1048,6 +1339,21 @@ fn draw_modal(f: &mut Frame, area: Rect, app: &App, m: &Modal) {
             ]));
             ("Submit", v)
         }
+        Modal::ConfirmEndTraining => (
+            "End training",
+            vec![
+                Line::from("End this training session?").bold(),
+                Line::raw(""),
+                Line::from("Answers you've already checked are saved.").fg(DIM),
+                Line::raw(""),
+                Line::from(vec![
+                    Span::styled(" y ", Style::new().fg(Color::Black).bg(WARN).bold()),
+                    Span::raw(" end    "),
+                    Span::styled(" any key ", Style::new().fg(Color::Black).bg(DIM).bold()),
+                    Span::raw(" keep going"),
+                ]),
+            ],
+        ),
         Modal::ConfirmAbandon => (
             "Abandon",
             vec![

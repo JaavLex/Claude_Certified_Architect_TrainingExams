@@ -1,4 +1,4 @@
-//! Persistent attempt history (JSON in the user's data dir).
+//! Persistent attempt history and training log (JSON in the user's data dir).
 
 use crate::score::ScoreReport;
 use serde::{Deserialize, Serialize};
@@ -23,26 +23,55 @@ fn default_limit() -> u64 {
     crate::exam::DEFAULT_MINUTES * 60
 }
 
+/// One question answered in training mode. Kept separate from exam attempts
+/// so training never changes exam scores or history comparisons.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PracticeRecord {
+    pub exam_id: String,
+    /// The question's `number` in the exam file.
+    pub question: usize,
+    pub correct: bool,
+    /// Unix seconds when it was answered.
+    pub at: i64,
+}
+
+fn data_file(name: &str) -> PathBuf {
+    dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("exam-tui").join(name)
+}
+
 pub fn path() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("exam-tui")
-        .join("attempts.json")
+    data_file("attempts.json")
 }
 
-pub fn load() -> Vec<Attempt> {
-    std::fs::read_to_string(path())
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+pub fn practice_path() -> PathBuf {
+    data_file("practice.json")
 }
 
-pub fn save(attempts: &[Attempt]) -> std::io::Result<()> {
-    let p = path();
+fn read<T: serde::de::DeserializeOwned>(p: PathBuf) -> Vec<T> {
+    std::fs::read_to_string(p).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn write<T: Serialize>(p: PathBuf, items: &[T]) -> std::io::Result<()> {
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir)?;
     }
     let tmp = p.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_string_pretty(attempts)?)?;
+    std::fs::write(&tmp, serde_json::to_string_pretty(items)?)?;
     std::fs::rename(tmp, p)
+}
+
+pub fn load() -> Vec<Attempt> {
+    read(path())
+}
+
+pub fn save(attempts: &[Attempt]) -> std::io::Result<()> {
+    write(path(), attempts)
+}
+
+pub fn load_practice() -> Vec<PracticeRecord> {
+    read(practice_path())
+}
+
+pub fn save_practice(records: &[PracticeRecord]) -> std::io::Result<()> {
+    write(practice_path(), records)
 }

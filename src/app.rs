@@ -1,8 +1,9 @@
 //! Application state and input handling.
 
-use crate::exam::{self, Exam};
+use crate::exam::{self, Exam, Question};
 use crate::score;
-use crate::store::{self, Attempt};
+use crate::store::{self, Attempt, PracticeRecord};
+use crate::train::{self, PoolItem, QStat};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -37,6 +38,78 @@ impl Session {
     }
 }
 
+/// Select or deselect option `idx` of `q`, enforcing "select exactly N".
+/// Returns a notice when the selection is already full.
+fn toggle_answer(q: &Question, ans: &mut Vec<char>, idx: usize) -> Option<String> {
+    let letter = q.options.get(idx)?.key;
+    if let Some(p) = ans.iter().position(|&c| c == letter) {
+        ans.remove(p);
+    } else if q.select == 1 {
+        *ans = vec![letter];
+    } else if ans.len() < q.select {
+        ans.push(letter);
+        ans.sort_unstable();
+    } else {
+        return Some(format!("Select exactly {} — deselect one before choosing another", q.select));
+    }
+    None
+}
+
+/// Map an option-picking key to an option index: a–e by key, 1–9 by position.
+fn option_index(q: &Question, code: KeyCode) -> Option<usize> {
+    match code {
+        KeyCode::Char(c @ ('a'..='e' | 'A'..='E')) => {
+            let key = c.to_ascii_uppercase();
+            q.options.iter().position(|o| o.key == key)
+        }
+        KeyCode::Char(c @ '1'..='9') => Some((c as u8 - b'1') as usize),
+        _ => None,
+    }
+}
+
+/// Setup choices for a training session.
+pub struct TrainSetup {
+    /// Highlighted row: 0 exam, 1 domain, 2 size, 3 start.
+    pub field: usize,
+    pub exam: Option<usize>,
+    pub domain: Option<String>,
+    /// Index into `train::SIZES`.
+    pub size: usize,
+}
+
+pub struct TrainSession {
+    pub items: Vec<PoolItem>,
+    pub current: usize,
+    pub cursor: usize,
+    pub chosen: Vec<char>,
+    /// Whether the current answer has been checked.
+    pub revealed: bool,
+    /// Result of each checked item.
+    pub results: Vec<bool>,
+    /// Stat of the current item after checking it.
+    pub after: Option<QStat>,
+    pub scroll: u16,
+    pub notice: Option<(String, Instant)>,
+}
+
+impl TrainSession {
+    pub fn notice(&self) -> Option<&str> {
+        self.notice
+            .as_ref()
+            .filter(|(_, t)| t.elapsed() < Duration::from_millis(2200))
+            .map(|(s, _)| s.as_str())
+    }
+}
+
+pub struct TrainSummary {
+    pub items: Vec<PoolItem>,
+    pub results: Vec<bool>,
+    /// Items no longer weak after the session.
+    pub mastered: usize,
+    /// Weak questions left overall.
+    pub remaining: usize,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ReviewFilter {
     All,
@@ -68,12 +141,16 @@ pub enum Screen {
     Results { attempt: usize, shown: Instant, from_history: bool },
     Review { attempt: usize, filter: ReviewFilter, cursor: usize, scroll: u16, from_history: bool },
     History { cursor: usize, filter: Option<usize> },
+    TrainSetup(TrainSetup),
+    Train(TrainSession),
+    TrainDone(TrainSummary),
 }
 
 pub enum Modal {
     ConfirmSubmit,
     ConfirmAbandon,
     ConfirmDelete,
+    ConfirmEndTraining,
     Goto(String),
     LoadErrors,
 }
@@ -81,6 +158,7 @@ pub enum Modal {
 pub struct App {
     pub exams: Vec<Exam>,
     pub attempts: Vec<Attempt>,
+    pub practice: Vec<PracticeRecord>,
     pub screen: Screen,
     pub modal: Option<Modal>,
     pub quit: bool,
@@ -97,6 +175,7 @@ impl App {
         App {
             exams: loaded.exams,
             attempts: store::load(),
+            practice: store::load_practice(),
             screen: Screen::Menu { cursor: 0 },
             modal: None,
             quit: false,
@@ -106,9 +185,60 @@ impl App {
         }
     }
 
-    /// Menu rows: one per exam, then history, then quit.
+    /// Menu rows: one per exam, then training, history, quit.
     pub fn menu_len(&self) -> usize {
-        self.exams.len() + 2
+        self.exams.len() + 3
+    }
+
+    pub fn menu_train(&self) -> usize {
+        self.exams.len()
+    }
+
+    pub fn question_stats(&self) -> std::collections::HashMap<train::Key, QStat> {
+        train::stats(&self.exams, &self.attempts, &self.practice)
+    }
+
+    fn start_training(&mut self, setup: &TrainSetup) {
+        let st = self.question_stats();
+        let pool = train::weak_pool(&self.exams, &st, setup.exam, setup.domain.as_deref());
+        if pool.is_empty() {
+            return;
+        }
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(1);
+        let items = train::pick(pool, train::SIZES[setup.size], seed);
+        self.screen = Screen::Train(TrainSession {
+            items,
+            current: 0,
+            cursor: 0,
+            chosen: Vec::new(),
+            revealed: false,
+            results: Vec::new(),
+            after: None,
+            scroll: 0,
+            notice: None,
+        });
+    }
+
+    fn finish_training(&mut self) {
+        let Screen::Train(t) = std::mem::replace(&mut self.screen, Screen::Menu { cursor: 0 }) else { return };
+        if t.results.is_empty() {
+            self.screen = Screen::Menu { cursor: self.menu_train() };
+            return;
+        }
+        let st = self.question_stats();
+        let items: Vec<PoolItem> = t.items.into_iter().take(t.results.len()).collect();
+        let mastered = items
+            .iter()
+            .filter(|p| {
+                let e = &self.exams[p.exam];
+                !st.get(&(e.id.clone(), e.questions[p.q].number)).is_some_and(QStat::is_weak)
+            })
+            .count();
+        let remaining = st.values().filter(|s| s.is_weak()).count();
+        self.screen = Screen::TrainDone(TrainSummary { items, results: t.results, mastered, remaining });
     }
 
     /// Re-scan the exam folder and command-line paths.
@@ -233,6 +363,9 @@ impl App {
                     }
                 }
                 KeyCode::Char('h') => self.screen = Screen::History { cursor: 0, filter: None },
+                KeyCode::Char('t') => {
+                    self.screen = Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
+                }
                 KeyCode::Char('r') => {
                     self.reload();
                     self.screen = Screen::Menu { cursor: 0 };
@@ -241,7 +374,11 @@ impl App {
                 KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
                 KeyCode::Enter | KeyCode::Char(' ') => match *cursor {
                     c if c < n_exams => self.screen = Screen::Intro { exam: c },
-                    c if c == n_exams => self.screen = Screen::History { cursor: 0, filter: None },
+                    c if c == n_exams => {
+                        self.screen =
+                            Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
+                    }
+                    c if c == n_exams + 1 => self.screen = Screen::History { cursor: 0, filter: None },
                     _ => self.quit = true,
                 },
                 _ => {}
@@ -305,6 +442,17 @@ impl App {
             }
             Screen::Review { .. } => self.on_review_key(key),
             Screen::History { .. } => self.on_history_key(key),
+            Screen::TrainSetup(_) => self.on_train_setup_key(key),
+            Screen::Train(_) => self.on_train_key(key),
+            Screen::TrainDone(_) => match key.code {
+                KeyCode::Char('t') => {
+                    self.screen = Screen::TrainSetup(TrainSetup { field: 3, exam: None, domain: None, size: 1 })
+                }
+                KeyCode::Enter | KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
+                    self.screen = Screen::Menu { cursor: n_exams }
+                }
+                _ => {}
+            },
         }
     }
 
@@ -337,6 +485,12 @@ impl App {
                 }
                 _ => self.modal = None,
             },
+            Modal::ConfirmEndTraining => {
+                self.modal = None;
+                if key.code == KeyCode::Char('y') {
+                    self.finish_training();
+                }
+            }
             Modal::ConfirmAbandon => match key.code {
                 KeyCode::Char('y') => {
                     self.modal = None;
@@ -368,21 +522,12 @@ impl App {
         let last = s.answers.len() - 1;
 
         let toggle = |s: &mut Session, idx: usize| {
-            let Some(letter) = q.options.get(idx).map(|o| o.key) else { return };
+            if idx >= n_opts {
+                return;
+            }
             s.cursor = idx;
-            let ans = &mut s.answers[s.current];
-            if let Some(p) = ans.iter().position(|&c| c == letter) {
-                ans.remove(p);
-            } else if q.select == 1 {
-                *ans = vec![letter];
-            } else if ans.len() < q.select {
-                ans.push(letter);
-                ans.sort_unstable();
-            } else {
-                s.notice = Some((
-                    format!("Select exactly {} — deselect one before choosing another", q.select),
-                    Instant::now(),
-                ));
+            if let Some(msg) = toggle_answer(q, &mut s.answers[s.current], idx) {
+                s.notice = Some((msg, Instant::now()));
             }
         };
 
@@ -393,14 +538,11 @@ impl App {
                 let c = s.cursor;
                 toggle(s, c)
             }
-            // a–e pick the option with that key; 1–9 pick by position.
-            KeyCode::Char(c @ ('a'..='e' | 'A'..='E')) => {
-                let key = c.to_ascii_uppercase();
-                if let Some(i) = q.options.iter().position(|o| o.key == key) {
+            code @ KeyCode::Char('a'..='e' | 'A'..='E' | '1'..='9') => {
+                if let Some(i) = option_index(q, code) {
                     toggle(s, i)
                 }
             }
-            KeyCode::Char(c @ '1'..='9') => toggle(s, (c as u8 - b'1') as usize),
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('n') | KeyCode::Tab => {
                 if s.current < last {
                     s.current += 1;
@@ -539,8 +681,139 @@ impl App {
                 }
             }
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
-                self.screen = Screen::Menu { cursor: n_exams }
+                self.screen = Screen::Menu { cursor: n_exams + 1 }
             }
+            _ => {}
+        }
+    }
+
+    fn on_train_setup_key(&mut self, key: KeyEvent) {
+        let n_exams = self.exams.len();
+        let st = self.question_stats();
+        let Screen::TrainSetup(t) = &mut self.screen else { return };
+        let domains: Vec<String> =
+            train::weak_domains(&self.exams, &st, t.exam).into_iter().map(|(d, _)| d).collect();
+        let step = |forward: bool, t: &mut TrainSetup| match t.field {
+            0 => {
+                // None → 0 → 1 → … → None
+                t.exam = match (t.exam, forward) {
+                    (None, true) => (n_exams > 0).then_some(0),
+                    (None, false) => n_exams.checked_sub(1),
+                    (Some(i), true) => (i + 1 < n_exams).then_some(i + 1),
+                    (Some(i), false) => i.checked_sub(1),
+                };
+                t.domain = None;
+            }
+            1 => {
+                let pos = t.domain.as_ref().and_then(|d| domains.iter().position(|x| x == d));
+                t.domain = match (pos, forward) {
+                    (None, true) => domains.first().cloned(),
+                    (None, false) => domains.last().cloned(),
+                    (Some(i), true) => domains.get(i + 1).cloned(),
+                    (Some(i), false) => i.checked_sub(1).and_then(|j| domains.get(j).cloned()),
+                };
+            }
+            2 => {
+                let n = train::SIZES.len();
+                t.size = if forward { (t.size + 1) % n } else { (t.size + n - 1) % n };
+            }
+            _ => {}
+        };
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => t.field = (t.field + 3) % 4,
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Tab => t.field = (t.field + 1) % 4,
+            KeyCode::Left | KeyCode::Char('h') => step(false, t),
+            KeyCode::Right | KeyCode::Char('l') => step(true, t),
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                if t.field == 3 || key.code == KeyCode::Enter {
+                    let setup = TrainSetup { field: t.field, exam: t.exam, domain: t.domain.clone(), size: t.size };
+                    self.start_training(&setup);
+                } else {
+                    step(true, t);
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('q') => self.screen = Screen::Menu { cursor: n_exams },
+            _ => {}
+        }
+    }
+
+    fn on_train_key(&mut self, key: KeyEvent) {
+        let Screen::Train(t) = &mut self.screen else { return };
+        let item = t.items[t.current].clone();
+        let e = &self.exams[item.exam];
+        let q = &e.questions[item.q];
+        let n_opts = q.options.len();
+
+        if t.revealed {
+            match key.code {
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char(' ') | KeyCode::Char('n') | KeyCode::Char('l') => {
+                    if t.current + 1 >= t.items.len() {
+                        self.finish_training();
+                    } else {
+                        t.current += 1;
+                        t.cursor = 0;
+                        t.chosen.clear();
+                        t.revealed = false;
+                        t.after = None;
+                        t.scroll = 0;
+                    }
+                }
+                KeyCode::PageDown | KeyCode::Char('J') | KeyCode::Down | KeyCode::Char('j') => {
+                    t.scroll = t.scroll.saturating_add(2)
+                }
+                KeyCode::PageUp | KeyCode::Char('K') | KeyCode::Up | KeyCode::Char('k') => {
+                    t.scroll = t.scroll.saturating_sub(2)
+                }
+                KeyCode::Esc | KeyCode::Char('q') => self.modal = Some(Modal::ConfirmEndTraining),
+                _ => {}
+            }
+            return;
+        }
+
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => t.cursor = (t.cursor + n_opts - 1) % n_opts,
+            KeyCode::Down | KeyCode::Char('j') => t.cursor = (t.cursor + 1) % n_opts,
+            KeyCode::Char(' ') => {
+                if let Some(msg) = toggle_answer(q, &mut t.chosen, t.cursor) {
+                    t.notice = Some((msg, Instant::now()));
+                }
+            }
+            code @ KeyCode::Char('a'..='e' | 'A'..='E' | '1'..='9') => {
+                if let Some(i) = option_index(q, code).filter(|&i| i < n_opts) {
+                    t.cursor = i;
+                    if let Some(msg) = toggle_answer(q, &mut t.chosen, i) {
+                        t.notice = Some((msg, Instant::now()));
+                    }
+                }
+            }
+            KeyCode::Enter => {
+                if t.chosen.len() != q.select {
+                    // For single-answer questions Enter picks the highlighted option.
+                    if q.select == 1 {
+                        t.chosen = vec![q.options[t.cursor].key];
+                    } else {
+                        t.notice =
+                            Some((format!("Select {} options, then press Enter to check", q.select), Instant::now()));
+                        return;
+                    }
+                }
+                let ok = q.is_correct(&t.chosen);
+                self.practice.push(PracticeRecord {
+                    exam_id: e.id.clone(),
+                    question: q.number,
+                    correct: ok,
+                    at: chrono::Local::now().timestamp(),
+                });
+                self.save_error = store::save_practice(&self.practice).err().map(|e| e.to_string());
+                let after = train::stats(&self.exams, &self.attempts, &self.practice)
+                    .get(&(e.id.clone(), q.number))
+                    .copied();
+                let Screen::Train(t) = &mut self.screen else { return };
+                t.results.push(ok);
+                t.revealed = true;
+                t.after = after;
+            }
+            KeyCode::Esc | KeyCode::Char('q') => self.modal = Some(Modal::ConfirmEndTraining),
             _ => {}
         }
     }

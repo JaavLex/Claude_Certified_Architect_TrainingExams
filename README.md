@@ -13,6 +13,7 @@ Built in Rust with [ratatui](https://ratatui.rs). It uses only your terminal's o
 - **Navigator.** A grid of all 60 questions shows which are answered, incomplete, flagged or unanswered. You can flag questions and jump to any number, or to the next unanswered or flagged one.
 - **Results.** Shows PASS or FAIL, the scaled score with the 720 mark, the number correct, the time used, the percentage correct per domain, and readiness advice.
 - **Review.** Shows all questions, only the wrong ones or only the right ones. For each question you see your answer, the correct answer, and the explanation from the answer key. For "Select 2" questions it also lists which correct option you missed.
+- **Train weaknesses.** Practise the questions you most often get wrong, across all your attempts, with the answer and explanation shown right after each one. See [Training mode](#training-mode).
 - **Attempt history.** Lists every past attempt with the change from your previous try. It also compares domain scores between attempts and charts your scores over time. You can reopen the results or review of any attempt, or delete it.
 
 ## Scoring
@@ -34,6 +35,18 @@ Scoring follows the CCAR-F Exam Guide, section 10, "How the Exam Is Scored":
 For the per-domain breakdown, a question tagged with two domains (e.g. `D4/1`) counts under the first one.
 
 Custom exams are scored with the same rules. Only the number of items and the time limit can differ.
+
+## Training mode
+
+Choose **Train weaknesses** on the menu (or press `t`) to practise the questions you get wrong.
+
+- **Weak questions.** Any question you have answered wrong, in an exam or in training, is weak. It stays weak until you answer it right **2 times in a row**. Questions you left unanswered in an exam are ignored, because running out of time says nothing about what you know.
+- **Order.** The weakest questions are picked first: the ones you missed last time, then the ones missed most often, then the highest miss rate. The chosen set is shuffled so you don't learn the order by heart.
+- **Setup.** Choose the exam (or all exams), the domain (or all domains), and how many questions: 10, 20, 30 or all. The setup screen shows how many weak questions you have in each domain.
+- **Instant feedback.** There is no time limit. Press `Enter` to check your answer and see whether it is right, the correct answer, the explanation, and how many times you've missed the question. Then you see whether it is now mastered, one correct answer away from it, or still weak.
+- **Summary.** At the end you see your score, how many questions you mastered, and how many weak questions are left.
+
+Training results are saved separately from exam attempts, so they never change your exam scores or history comparisons.
 
 ## Install and run
 
@@ -70,6 +83,7 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | Menu | `↑↓` / `j k`, `Enter` | Move, select |
 | | `1`–`9` | Start that exam |
 | | `h` | Attempt history |
+| | `t` | Train weaknesses |
 | | `r` | Reload exam files |
 | | `e` | Show exam files that failed to load |
 | | `q` | Quit |
@@ -88,6 +102,12 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | Review | `↑↓` | Move between questions |
 | | `PgUp` / `PgDn` (`K` / `J`) | Scroll the explanation |
 | | `f` | Switch filter: all / incorrect / correct |
+| Training setup | `↑↓` | Choose a setting |
+| | `←→` | Change it |
+| | `Enter` | Start |
+| Training | `↑↓`, `a`–`e`, `1`–`9`, `Space` | Choose options, as in the exam |
+| | `Enter` | Check the answer, then go to the next question |
+| | `Esc` | End the session (answers already checked are saved) |
 | History | `Enter` | Open the attempt's results |
 | | `r` | Review that attempt's mistakes |
 | | `Tab` | Filter by exam |
@@ -95,11 +115,13 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 
 ## Data
 
-Attempts are saved as JSON in your user data folder, next to the `exams/` folder for custom exams:
+Exam attempts (`attempts.json`) and training results (`practice.json`) are saved as JSON in your user data folder, next to the `exams/` folder for custom exams:
 
-- Linux: `~/.local/share/exam-tui/attempts.json`
-- macOS: `~/Library/Application Support/exam-tui/attempts.json`
-- Windows: `%APPDATA%\exam-tui\attempts.json`
+- Linux: `~/.local/share/exam-tui/`
+- macOS: `~/Library/Application Support/exam-tui/`
+- Windows: `%APPDATA%\exam-tui\`
+
+Training links results to questions by exam `id` and question `number`. Keep both the same when you edit an exam file, or its training history will no longer match.
 
 ## Custom exams
 
@@ -196,7 +218,8 @@ src/
   ui.rs     drawing each screen
   exam.rs   loading and checking exam JSON files
   score.rs  scoring and pass/fail
-  store.rs  saved attempt history
+  train.rs  weak-question stats and selection for training
+  store.rs  saved attempt history and training log
   text.rs   formatting and line wrapping
 exams/      built-in practice exams (JSON)
 examples/   example custom exam

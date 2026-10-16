@@ -1,0 +1,1775 @@
+{
+  "$schema": "../schema/exam.schema.json",
+  "id": "exam2",
+  "title": "Practice Exam #2 — CCAR-F (60 items, 120 minutes)",
+  "time_limit_minutes": 120,
+  "domains": [
+    {
+      "id": "D1",
+      "name": "Agentic Architecture & Orchestration"
+    },
+    {
+      "id": "D2",
+      "name": "Tool Design & MCP Integration"
+    },
+    {
+      "id": "D3",
+      "name": "Claude Code Configuration & Workflows"
+    },
+    {
+      "id": "D4",
+      "name": "Prompt Engineering & Structured Output"
+    },
+    {
+      "id": "D5",
+      "name": "Context Management & Reliability"
+    },
+    {
+      "id": "Misc",
+      "name": "Miscellaneous / Scope"
+    }
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "You want to onboard engineers to an unfamiliar legacy codebase with Claude. Which built-in tool finds all imports of a deprecated module across the codebase?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Glob `**/*`"
+        },
+        {
+          "key": "B",
+          "text": "Grep for the module name"
+        },
+        {
+          "key": "C",
+          "text": "Read all files"
+        },
+        {
+          "key": "D",
+          "text": "Bash `ls -R`"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Grep finds content; module imports are content patterns."
+    },
+    {
+      "number": 2,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "An Edit operation fails repeatedly — the target code string appears in many files. The reliable fix?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Retry Edit at higher precision."
+        },
+        {
+          "key": "B",
+          "text": "Use Read to load the full file, then Write the corrected content."
+        },
+        {
+          "key": "C",
+          "text": "Use Glob to find unique lines."
+        },
+        {
+          "key": "D",
+          "text": "Restart Claude Code."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Read + Write fallback for non-unique Edit text."
+    },
+    {
+      "number": 3,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Recommended order to build a mental model of a new codebase?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Read every file once."
+        },
+        {
+          "key": "B",
+          "text": "Start with Grep for entry points, then Read to trace imports and flows — incrementally."
+        },
+        {
+          "key": "C",
+          "text": "Glob all files, then Write notes."
+        },
+        {
+          "key": "D",
+          "text": "Use Bash to grep and never use Read."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Incremental: Grep entry points → Read imports."
+    },
+    {
+      "number": 4,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "You trace usage of an exported function across wrapper modules. Best approach?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Identify all exported names first; then search (Grep) for each name across the codebase."
+        },
+        {
+          "key": "B",
+          "text": "Read each file once."
+        },
+        {
+          "key": "C",
+          "text": "Use Glob on `*.md`."
+        },
+        {
+          "key": "D",
+          "text": "Add console logs everywhere."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Identify exported names → Grep each across codebase."
+    },
+    {
+      "number": 5,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "You want Claude to integrate an MCP-based Jira server. Do you prefer a community server or a custom one?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Always custom for full control."
+        },
+        {
+          "key": "B",
+          "text": "Prefer the existing community MCP server for standard integrations like Jira; reserve custom servers for team-specific workflows."
+        },
+        {
+          "key": "C",
+          "text": "Neither — disable MCP."
+        },
+        {
+          "key": "D",
+          "text": "Use built-in Grep instead."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Prefer community MCP for standard integrations; custom only for team-specific."
+    },
+    {
+      "number": 6,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "The agent keeps preferring built-in `Grep` over your MCP `search_kb` even though `search_kb` is more capable. Root cause / fix?",
+      "options": [
+        {
+          "key": "A",
+          "text": "MCP servers must be project-scoped."
+        },
+        {
+          "key": "B",
+          "text": "Enhance the MCP tool description to explain capabilities and outputs in detail."
+        },
+        {
+          "key": "C",
+          "text": "Disable Grep."
+        },
+        {
+          "key": "D",
+          "text": "Use `tool_choice` to force it."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Enhance MCP tool descriptions so agent prefers them over built-ins."
+    },
+    {
+      "number": 7,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Expose a catalog of available documentation/issue summaries so the agent knows what data exists without exploratory calls. Use which MCP primitive?",
+      "options": [
+        {
+          "key": "A",
+          "text": "MCP Tools"
+        },
+        {
+          "key": "B",
+          "text": "MCP Resources (content catalogs)"
+        },
+        {
+          "key": "C",
+          "text": "CLAUDE.md imports"
+        },
+        {
+          "key": "D",
+          "text": "Skills"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "MCP Resources expose content catalogs."
+    },
+    {
+      "number": 8,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Personal/experimental MCP server you don't want to share via version control. Where?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`.mcp.json` at repo root."
+        },
+        {
+          "key": "B",
+          "text": "`~/.claude.json` (user-scoped)."
+        },
+        {
+          "key": "C",
+          "text": "`CLAUDE.md`."
+        },
+        {
+          "key": "D",
+          "text": "`.claude/skills/`."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`~/.claude.json` user-scoped for personal/experimental."
+    },
+    {
+      "number": 9,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "You need `${GITHUB_TOKEN}` in `.mcp.json` for credentials without committing the secret. Supported?",
+      "options": [
+        {
+          "key": "A",
+          "text": "No — hard-code tokens."
+        },
+        {
+          "key": "B",
+          "text": "Yes — `.mcp.json` supports environment variable expansion like `${GITHUB_TOKEN}`."
+        },
+        {
+          "key": "C",
+          "text": "Only on Linux."
+        },
+        {
+          "key": "D",
+          "text": "Only with a managed policy."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`${VAR}` env expansion supported in `.mcp.json`."
+    },
+    {
+      "number": 10,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Are tools from all configured MCP servers available at once?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Only one server at a time."
+        },
+        {
+          "key": "B",
+          "text": "Yes — discovered at connection time and available simultaneously."
+        },
+        {
+          "key": "C",
+          "text": "Only after `/memory`."
+        },
+        {
+          "key": "D",
+          "text": "Only project-scoped servers."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Tools from all servers available simultaneously at connection."
+    },
+    {
+      "number": 11,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D3",
+      "select": 2,
+      "text": "Two ways to make a codebase-exploration workflow not pollute the main conversation? (select exactly 2)",
+      "options": [
+        {
+          "key": "A",
+          "text": "Use the **Explore** subagent for verbose discovery output."
+        },
+        {
+          "key": "B",
+          "text": "Use a skill with **`context: fork`**."
+        },
+        {
+          "key": "C",
+          "text": "Add all exploration output to CLAUDE.md."
+        },
+        {
+          "key": "D",
+          "text": "Disable `/compact`."
+        }
+      ],
+      "answer": [
+        "A",
+        "B"
+      ],
+      "why": "Explore subagent + `context: fork` skill both isolate verbose output."
+    },
+    {
+      "number": 12,
+      "scenario": "Scenario E — Developer Productivity with Claude (Q1–12)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Long exploration sessions suffer context degradation. Best recovery design?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Each agent exports state to a known location (manifest); coordinator loads manifest on resume and injects into prompts."
+        },
+        {
+          "key": "B",
+          "text": "Always restart from scratch."
+        },
+        {
+          "key": "C",
+          "text": "Increase the model's max_tokens."
+        },
+        {
+          "key": "D",
+          "text": "Switch to a smaller context window."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Structured state manifests for crash recovery."
+    },
+    {
+      "number": 13,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Strict JSON schema via tool use eliminates which errors?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Semantic errors (sum mismatches)."
+        },
+        {
+          "key": "B",
+          "text": "Syntax errors only — not semantic."
+        },
+        {
+          "key": "C",
+          "text": "All errors."
+        },
+        {
+          "key": "D",
+          "text": "None."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Strict schema eliminates syntax errors only; not semantic."
+    },
+    {
+      "number": 14,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Best field for analyzing why reviewers dismiss findings?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`severity`"
+        },
+        {
+          "key": "B",
+          "text": "`detected_pattern` field tracking the code construct that triggered the finding."
+        },
+        {
+          "key": "C",
+          "text": "`author`"
+        },
+        {
+          "key": "D",
+          "text": "`timestamp`"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`detected_pattern` field for FP-pattern analysis."
+    },
+    {
+      "number": 15,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Batch of 100 docs: 8 failed with \"context length exceeded.\" Correct resubmission?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Resubmit all 100."
+        },
+        {
+          "key": "B",
+          "text": "Resubmit only the 8 failed (by `custom_id`) with modification: chunk oversized documents."
+        },
+        {
+          "key": "C",
+          "text": "Resubmit with `tool_choice: any`."
+        },
+        {
+          "key": "D",
+          "text": "Switch to real-time for everything."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Resubmit only failed by `custom_id`; chunk oversized."
+    },
+    {
+      "number": 16,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Before batch-processing large volumes, what maximizes first-pass success?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Run prompt refinement on a sample set, then batch the volume."
+        },
+        {
+          "key": "B",
+          "text": "Submit everything at max temperature."
+        },
+        {
+          "key": "C",
+          "text": "Use a single mega-prompt."
+        },
+        {
+          "key": "D",
+          "text": "Disable validation."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Prompt refinement on sample set first maximizes first-pass success."
+    },
+    {
+      "number": 17,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Field-level confidence scores — how to use them?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Ignore; use overall confidence."
+        },
+        {
+          "key": "B",
+          "text": "Output field-level confidence; calibrate review thresholds using labeled validation sets."
+        },
+        {
+          "key": "C",
+          "text": "Hard-code at 0.9."
+        },
+        {
+          "key": "D",
+          "text": "Only for the first field."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Field-level confidence; calibrate thresholds with labeled validation sets."
+    },
+    {
+      "number": 18,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Why must you analyze accuracy by document type and field before automating high-confidence extractions?",
+      "options": [
+        {
+          "key": "A",
+          "text": "To save tokens."
+        },
+        {
+          "key": "B",
+          "text": "Aggregate metrics (e.g., 97%) can mask poor performance on specific document types or fields."
+        },
+        {
+          "key": "C",
+          "text": "To reduce model size."
+        },
+        {
+          "key": "D",
+          "text": "To speed up JSON parsing."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Aggregate masks weak segments."
+    },
+    {
+      "number": 19,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Document uses inline citations; another uses a bibliography; another embeds details in prose. Best few-shot strategy?",
+      "options": [
+        {
+          "key": "A",
+          "text": "One universal example."
+        },
+        {
+          "key": "B",
+          "text": "2–4 targeted few-shot examples demonstrating extraction from varied document structures."
+        },
+        {
+          "key": "C",
+          "text": "10 examples of the same style."
+        },
+        {
+          "key": "D",
+          "text": "No few-shot; strict schema is enough."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Targeted few-shot for varied document structures."
+    },
+    {
+      "number": 20,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Required-field model fabricated a phone number to satisfy the schema when absent from source. Fix?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Make the phone field optional/nullable."
+        },
+        {
+          "key": "B",
+          "text": "Add a retry."
+        },
+        {
+          "key": "C",
+          "text": "Increase temperature."
+        },
+        {
+          "key": "D",
+          "text": "Make it required + enum."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Optional/nullable prevents fabrication."
+    },
+    {
+      "number": 21,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Format inconsistency between sources (mix of `2024-01-05`, `Jan 5, 2024`, epoch). Best practice?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Add format normalization rules in the prompt alongside strict output schemas."
+        },
+        {
+          "key": "B",
+          "text": "Remove the date field."
+        },
+        {
+          "key": "C",
+          "text": "Use a regex parser post-hoc."
+        },
+        {
+          "key": "D",
+          "text": "Switch to free-text."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Format normalization rules alongside strict schemas."
+    },
+    {
+      "number": 22,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Time budget: ~50% cost savings matter; result tolerance is \"overnight.\" Choose API:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Synchronous."
+        },
+        {
+          "key": "B",
+          "text": "Message Batches API."
+        },
+        {
+          "key": "C",
+          "text": "Streaming."
+        },
+        {
+          "key": "D",
+          "text": "Single-call."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Batches for overnight; ~50% savings."
+    },
+    {
+      "number": 23,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Routes for review when source data is ambiguous/contradictory:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Auto-accept."
+        },
+        {
+          "key": "B",
+          "text": "Route to human review (limited capacity), prioritize."
+        },
+        {
+          "key": "C",
+          "text": "Mark confidence 1.0."
+        },
+        {
+          "key": "D",
+          "text": "Discard."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Route ambiguous/contradictory to human review."
+    },
+    {
+      "number": 24,
+      "scenario": "Scenario F — Structured Data Extraction (Q13–24)",
+      "domain": "D4",
+      "select": 1,
+      "text": "In a self-correction flow, you'd add:",
+      "options": [
+        {
+          "key": "A",
+          "text": "`calculated_total` alongside `stated_total` and `conflict_detected` booleans."
+        },
+        {
+          "key": "B",
+          "text": "A second model."
+        },
+        {
+          "key": "C",
+          "text": "A hard stop."
+        },
+        {
+          "key": "D",
+          "text": "Few-shot only."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Computed cross-checks + `conflict_detected` for self-correction."
+    },
+    {
+      "number": 25,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "The agentic loop continues when:",
+      "options": [
+        {
+          "key": "A",
+          "text": "`stop_reason == \"end_turn\"`"
+        },
+        {
+          "key": "B",
+          "text": "`stop_reason == \"tool_use\"`"
+        },
+        {
+          "key": "C",
+          "text": "`stop_reason == \"max_tokens\"`"
+        },
+        {
+          "key": "D",
+          "text": "The user sends a new message."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`tool_use` continues the loop."
+    },
+    {
+      "number": 26,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Correct loop mechanism when the model requests a tool:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Ignore and respond with text."
+        },
+        {
+          "key": "B",
+          "text": "Execute the tool, append an assistant message with `tool_use` blocks and a user message with `tool_result` blocks, then re-send."
+        },
+        {
+          "key": "C",
+          "text": "Append only the tool's name to history."
+        },
+        {
+          "key": "D",
+          "text": "Restart with a new system prompt."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Execute → append assistant(tool_use) + user(tool_result) → resend."
+    },
+    {
+      "number": 27,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "PreToolUse hook returns `permissionDecision: \"deny\"` for a Bash `rm -rf` command. This is an example of:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Prompt-based guidance."
+        },
+        {
+          "key": "B",
+          "text": "Programmatic, deterministic enforcement of policy."
+        },
+        {
+          "key": "C",
+          "text": "A suggestion system."
+        },
+        {
+          "key": "D",
+          "text": "A tool description."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Programmatic/deterministic enforcement."
+    },
+    {
+      "number": 28,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "PostToolUse hook updates a tool's `updatedToolOutput` to a canonical ISO timestamp. This is:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Data normalization before the model processes results."
+        },
+        {
+          "key": "B",
+          "text": "Few-shot."
+        },
+        {
+          "key": "C",
+          "text": "Plan mode."
+        },
+        {
+          "key": "D",
+          "text": "/compact."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "PostToolUse data normalization."
+    },
+    {
+      "number": 29,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Two main hook patterns and their jobs:",
+      "options": [
+        {
+          "key": "A",
+          "text": "PostToolUse transforms results; PreToolUse/tool-call intercept blocks/redirects calls."
+        },
+        {
+          "key": "B",
+          "text": "Both block calls."
+        },
+        {
+          "key": "C",
+          "text": "Both transform outputs."
+        },
+        {
+          "key": "D",
+          "text": "Neither is programmatic."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "PostToolUse transforms; PreToolUse/intercept blocks."
+    },
+    {
+      "number": 30,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Giving a synthesis agent all web-search tools to avoid round-trips is:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Correct — least privilege."
+        },
+        {
+          "key": "B",
+          "text": "Wrong — violates separation of concerns; over-provisions."
+        },
+        {
+          "key": "C",
+          "text": "Required."
+        },
+        {
+          "key": "D",
+          "text": "Faster."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Over-provision violates separation of concerns."
+    },
+    {
+      "number": 31,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Recommended tool count per agent (sweet spot):",
+      "options": [
+        {
+          "key": "A",
+          "text": "1."
+        },
+        {
+          "key": "B",
+          "text": "4–5, scoped per role."
+        },
+        {
+          "key": "C",
+          "text": "18+."
+        },
+        {
+          "key": "D",
+          "text": "Unlimited."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "4–5 scoped per role; 18+ degrades selection."
+    },
+    {
+      "number": 32,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Replace broad `fetch_url` for a doc-analysis agent with:",
+      "options": [
+        {
+          "key": "A",
+          "text": "`fetch_url` AND all other tools."
+        },
+        {
+          "key": "B",
+          "text": "A constrained alternative like `load_document` that validates document URLs."
+        },
+        {
+          "key": "C",
+          "text": "`Grep`."
+        },
+        {
+          "key": "D",
+          "text": "No tools."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Constrained alternative (validates URLs)."
+    },
+    {
+      "number": 33,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Conventions that span multiple directories (e.g., all `*.tsx` files anywhere) — best mechanism:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Subdirectory CLAUDE.md per folder."
+        },
+        {
+          "key": "B",
+          "text": "`.claude/rules/` with `paths: [\"**/*.tsx\"]` glob frontmatter (path-specific rules)."
+        },
+        {
+          "key": "C",
+          "text": "One giant CLAUDE.md."
+        },
+        {
+          "key": "D",
+          "text": "A skill."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`.claude/rules/` w/ globs span directories; subdirectory CLAUDE.md is directory-bound."
+    },
+    {
+      "number": 34,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Team-shared `/security-audit` command available to all who clone the repo. Location?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`~/.claude/commands/`."
+        },
+        {
+          "key": "B",
+          "text": "`.claude/commands/` in the repository."
+        },
+        {
+          "key": "C",
+          "text": "`CLAUDE.md`."
+        },
+        {
+          "key": "D",
+          "text": "`.claude/config.json`."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`.claude/commands/` project-shared."
+    },
+    {
+      "number": 35,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Modularity of many CLAUDE.md files. Best practice?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Use `@import` to selectively include relevant standards files."
+        },
+        {
+          "key": "B",
+          "text": "Concatenate all into one file."
+        },
+        {
+          "key": "C",
+          "text": "Convert to JSON."
+        },
+        {
+          "key": "D",
+          "text": "Remove CLAUDE.md."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "`@import` for modular CLAUDE.md."
+    },
+    {
+      "number": 36,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D1",
+      "select": 1,
+      "text": "For \"add comprehensive tests to a legacy codebase,\" best decomposition strategy?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Rigid prompt chaining."
+        },
+        {
+          "key": "B",
+          "text": "Dynamic adaptive decomposition: map structure → identify high-impact areas → prioritized plan that adapts as dependencies are discovered."
+        },
+        {
+          "key": "C",
+          "text": "Single mega-prompt."
+        },
+        {
+          "key": "D",
+          "text": "No plan."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Dynamic adaptive decomposition for open-ended tasks."
+    },
+    {
+      "number": 37,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D4/1",
+      "select": 1,
+      "text": "Splitting large code reviews into per-file local passes + cross-file integration passes is an example of:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Multi-pass review / prompt chaining."
+        },
+        {
+          "key": "B",
+          "text": "Routing."
+        },
+        {
+          "key": "C",
+          "text": "/compact."
+        },
+        {
+          "key": "D",
+          "text": "Hooks."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Multi-pass review = prompt chaining variant."
+    },
+    {
+      "number": 38,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "TDD-style iteration with Claude:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Write test suites first (expected + edge + perf), then iterate by sharing test failures."
+        },
+        {
+          "key": "B",
+          "text": "Generate tests after."
+        },
+        {
+          "key": "C",
+          "text": "Skip tests."
+        },
+        {
+          "key": "D",
+          "text": "Use only prose."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "TDD: tests first, then iterate on failures."
+    },
+    {
+      "number": 39,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Interview pattern usage:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Have Claude ask questions to surface considerations before implementing in unfamiliar domains."
+        },
+        {
+          "key": "B",
+          "text": "Interview the model for trivia."
+        },
+        {
+          "key": "C",
+          "text": "Wait for the user to interview."
+        },
+        {
+          "key": "D",
+          "text": "Use only after bugs."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Interview pattern (Claude asks questions)."
+    },
+    {
+      "number": 40,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Interacting vs independent problems when fixing:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Always sequential."
+        },
+        {
+          "key": "B",
+          "text": "Always one message."
+        },
+        {
+          "key": "C",
+          "text": "Interacting problems → one detailed message; independent → sequential iteration."
+        },
+        {
+          "key": "D",
+          "text": "Never fix."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Interacting → one message; independent → sequential."
+    },
+    {
+      "number": 41,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "`/memory` command does what?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Resets memory."
+        },
+        {
+          "key": "B",
+          "text": "Shows which memory files are loaded; diagnose inconsistent behavior."
+        },
+        {
+          "key": "C",
+          "text": "Compacts context."
+        },
+        {
+          "key": "D",
+          "text": "Backs up to cloud."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`/memory` shows loaded files."
+    },
+    {
+      "number": 42,
+      "scenario": "Domain knowledge items — mixed (Q25–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "`/compact` does what?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Deletes history."
+        },
+        {
+          "key": "B",
+          "text": "Reduces context usage by summarizing conversation so far."
+        },
+        {
+          "key": "C",
+          "text": "Installs new MCP."
+        },
+        {
+          "key": "D",
+          "text": "Resumes a session."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`/compact` summarizes to free context."
+    },
+    {
+      "number": 43,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Coordinator/subagent multi-agent topology where the coordinator manages ALL inter-subagent communication is called:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Peer-to-peer."
+        },
+        {
+          "key": "B",
+          "text": "Hub-and-spoke."
+        },
+        {
+          "key": "C",
+          "text": "Pipeline-only."
+        },
+        {
+          "key": "D",
+          "text": "Federated."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Hub-and-spoke."
+    },
+    {
+      "number": 44,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Why route all subagent comms through the coordinator?",
+      "options": [
+        {
+          "key": "A",
+          "text": "To reduce model calls."
+        },
+        {
+          "key": "B",
+          "text": "For observability, consistent error handling, controlled information flow."
+        },
+        {
+          "key": "C",
+          "text": "Because subagents can't call tools."
+        },
+        {
+          "key": "D",
+          "text": "To reduce tokens."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Observability, consistent errors, controlled flow."
+    },
+    {
+      "number": 45,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Anti-pattern in multi-agent error handling:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Returning structured error context."
+        },
+        {
+          "key": "B",
+          "text": "Returning empty results as success when the tool timed out."
+        },
+        {
+          "key": "C",
+          "text": "Local recovery for transient errors."
+        },
+        {
+          "key": "D",
+          "text": "Propagating only unresolvable errors."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Suppress-as-success is an anti-pattern."
+    },
+    {
+      "number": 46,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D2/5",
+      "select": 1,
+      "text": "If `lookup_order` legitimately returns zero matching orders:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Report this as a transient error to retry."
+        },
+        {
+          "key": "B",
+          "text": "Represent as a **successful** query with no matches — NOT an error."
+        },
+        {
+          "key": "C",
+          "text": "Treat as business error."
+        },
+        {
+          "key": "D",
+          "text": "Treat as permission error."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Zero matches = successful empty result; not an error."
+    },
+    {
+      "number": 47,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Best escalation response when policy is ambiguous/silent (e.g., competitor price match when policy only addresses own-site adjustments):",
+      "options": [
+        {
+          "key": "A",
+          "text": "Decide unilaterally."
+        },
+        {
+          "key": "B",
+          "text": "Escalate because policy is ambiguous/silent on the specific request."
+        },
+        {
+          "key": "C",
+          "text": "Apply the closest matching rule."
+        },
+        {
+          "key": "D",
+          "text": "Always refuse."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Escalate on policy ambiguity/silence."
+    },
+    {
+      "number": 48,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Why might aggregate 97% accuracy be misleading before automating high-confidence extractions?",
+      "options": [
+        {
+          "key": "A",
+          "text": "It's always reliable."
+        },
+        {
+          "key": "B",
+          "text": "It may mask poor performance on specific document types or fields."
+        },
+        {
+          "key": "C",
+          "text": "It's a pass/fail marker."
+        },
+        {
+          "key": "D",
+          "text": "It guarantees no FP."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Aggregate masks per-segment weakness."
+    },
+    {
+      "number": 49,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Forge-independence principle for code review of AI-generated code: use a:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Second **independent** Claude instance (no prior reasoning context)."
+        },
+        {
+          "key": "B",
+          "text": "Verification pass in the same session."
+        },
+        {
+          "key": "C",
+          "text": "Higher temperature."
+        },
+        {
+          "key": "D",
+          "text": "Self-review with extended thinking."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Independent instance (no reasoning context)."
+    },
+    {
+      "number": 50,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "For plan mode, a good trigger is:",
+      "options": [
+        {
+          "key": "A",
+          "text": "A single-file bug fix with a clear stack trace."
+        },
+        {
+          "key": "B",
+          "text": "A monolith → microservices restructuring affecting 45+ files."
+        },
+        {
+          "key": "C",
+          "text": "Adding one validation check."
+        },
+        {
+          "key": "D",
+          "text": "A typo fix."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Architectural/large → plan mode."
+    },
+    {
+      "number": 51,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "For direct execution, a good trigger is:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Library migration affecting 45+ files."
+        },
+        {
+          "key": "B",
+          "text": "Architectural restructuring."
+        },
+        {
+          "key": "C",
+          "text": "Adding a single date validation conditional in one function."
+        },
+        {
+          "key": "D",
+          "text": "Choosing between two integration approaches with different infra."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Simple, well-scoped → direct execution."
+    },
+    {
+      "number": 52,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Reviewing generated code in CI in the **same** Claude session that generated it:",
+      "options": [
+        {
+          "key": "A",
+          "text": "More thorough — remembers reasoning."
+        },
+        {
+          "key": "B",
+          "text": "Less effective than an independent review instance (self-review blind spot)."
+        },
+        {
+          "key": "C",
+          "text": "Required by CI."
+        },
+        {
+          "key": "D",
+          "text": "Free of cost."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Self-review < independent instance."
+    },
+    {
+      "number": 53,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "A skill's frontmatter to prompt for required parameters when called without args:",
+      "options": [
+        {
+          "key": "A",
+          "text": "`argument-hint`"
+        },
+        {
+          "key": "B",
+          "text": "`context: fork`"
+        },
+        {
+          "key": "C",
+          "text": "`allowed-tools`"
+        },
+        {
+          "key": "D",
+          "text": "`disable-model-invocation`"
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "`argument-hint` for missing-arg prompts."
+    },
+    {
+      "number": 54,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Personal skill that shouldn't affect teammates lives where (with a different name)?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`.claude/skills/` (shared)."
+        },
+        {
+          "key": "B",
+          "text": "`~/.claude/skills/` with a different name."
+        },
+        {
+          "key": "C",
+          "text": "`.mcp.json`."
+        },
+        {
+          "key": "D",
+          "text": "`CLAUDE.md`."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`~/.claude/skills/` with a different name."
+    },
+    {
+      "number": 55,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Choose skills vs CLAUDE.md:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Both always-loaded."
+        },
+        {
+          "key": "B",
+          "text": "Skills = on-demand, task-specific; CLAUDE.md = always-loaded universal standards."
+        },
+        {
+          "key": "C",
+          "text": "CLAUDE.md is on-demand."
+        },
+        {
+          "key": "D",
+          "text": "Skills are universal."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Skills on-demand; CLAUDE.md always-loaded."
+    },
+    {
+      "number": 56,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Coordinator prompts should specify _______, not _______:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Step-by-step procedures; goals."
+        },
+        {
+          "key": "B",
+          "text": "Research goals + quality criteria; step-by-step procedural instructions."
+        },
+        {
+          "key": "C",
+          "text": "All possible questions; criteria."
+        },
+        {
+          "key": "D",
+          "text": "URLs; tools."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Goals + quality criteria, not procedures."
+    },
+    {
+      "number": 57,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D1/2/4",
+      "select": 1,
+      "text": "Three programmatic enforcement mechanisms for compliance (select best set) — pick the option that lists ONLY programmatic mechanisms:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Hooks, prerequisite gates, `tool_choice`."
+        },
+        {
+          "key": "B",
+          "text": "Hooks, system-prompt instructions, few-shot."
+        },
+        {
+          "key": "C",
+          "text": "System-prompt, routing classifier, schema."
+        },
+        {
+          "key": "D",
+          "text": "Few-shot, examples, retries."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Hooks, prerequisite gates, `tool_choice` are the programmatic set (no prompt/few-shot)."
+    },
+    {
+      "number": 58,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Two factors that make retry-with-error-feedback succeed (best pair):",
+      "options": [
+        {
+          "key": "A",
+          "text": "Information exists in source + format/structural error."
+        },
+        {
+          "key": "B",
+          "text": "Model temperature + token count."
+        },
+        {
+          "key": "C",
+          "text": "Number of tools + batch size."
+        },
+        {
+          "key": "D",
+          "text": "Confidence score + sentiment."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Info exists + format/structural error → retry works; absence → ineffective."
+    },
+    {
+      "number": 59,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "D5",
+      "select": 1,
+      "text": "To recover from a long-session crash, restore from:",
+      "options": [
+        {
+          "key": "A",
+          "text": "A random backup."
+        },
+        {
+          "key": "B",
+          "text": "Structured agent state exports (manifests) that the coordinator loads on resume and injects."
+        },
+        {
+          "key": "C",
+          "text": "/memory."
+        },
+        {
+          "key": "D",
+          "text": "None — must restart fresh."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "State manifests (structured agent exports)."
+    },
+    {
+      "number": 60,
+      "scenario": "Scenario mix items (Q43–60)",
+      "domain": "Misc",
+      "select": 1,
+      "text": "Out of scope (Exam Guide) — which topic will NOT appear?",
+      "options": [
+        {
+          "key": "A",
+          "text": "CLAUDE.md configuration."
+        },
+        {
+          "key": "B",
+          "text": "Fine-tuning Claude models / Constitutional AI."
+        },
+        {
+          "key": "C",
+          "text": "`tool_choice` options."
+        },
+        {
+          "key": "D",
+          "text": "Message Batches API."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Fine-tuning/Constitutional AI explicitly out-of-scope."
+    }
+  ]
+}

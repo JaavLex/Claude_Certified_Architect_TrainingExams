@@ -1,0 +1,1776 @@
+{
+  "$schema": "../schema/exam.schema.json",
+  "id": "exam1",
+  "title": "Practice Exam #1 — CCAR-F (60 items, 120 minutes)",
+  "time_limit_minutes": 120,
+  "domains": [
+    {
+      "id": "D1",
+      "name": "Agentic Architecture & Orchestration"
+    },
+    {
+      "id": "D2",
+      "name": "Tool Design & MCP Integration"
+    },
+    {
+      "id": "D3",
+      "name": "Claude Code Configuration & Workflows"
+    },
+    {
+      "id": "D4",
+      "name": "Prompt Engineering & Structured Output"
+    },
+    {
+      "id": "D5",
+      "name": "Context Management & Reliability"
+    },
+    {
+      "id": "Misc",
+      "name": "Miscellaneous / Scope"
+    }
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Production data shows that in 8% of cases your agent skips `get_customer` and calls `lookup_order` using only the customer's stated name, occasionally leading to misidentified accounts and incorrect refunds. What change most **effectively** addresses this?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Add a programmatic prerequisite blocking `lookup_order` and `process_refund` until `get_customer` has returned a verified customer ID."
+        },
+        {
+          "key": "B",
+          "text": "Enhance the system prompt to state customer verification is mandatory before any order operations."
+        },
+        {
+          "key": "C",
+          "text": "Add few-shot examples showing the agent always calling `get_customer` first."
+        },
+        {
+          "key": "D",
+          "text": "Implement a routing classifier that enables only the relevant tool subset per request type."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Deterministic compliance → prerequisite gate; B/C probabilistic; D addresses availability not ordering."
+    },
+    {
+      "number": 2,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Your agent calls `get_customer` for order queries (\"check my order #12345\") instead of `lookup_order`. Both tools have minimal descriptions (\"Retrieves customer information\" / \"Retrieves order details\"). What's the most **effective first step**?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Add 5–8 few-shot examples to the system prompt for order queries."
+        },
+        {
+          "key": "B",
+          "text": "Expand each tool's description with input formats, example queries, edge cases, and boundaries explaining when to use it vs alternatives."
+        },
+        {
+          "key": "C",
+          "text": "Implement a routing layer that parses input and pre-selects the tool."
+        },
+        {
+          "key": "D",
+          "text": "Consolidate into a single `lookup_entity` tool accepting any identifier."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Tool descriptions are the primary selection mechanism; few-shot/routing/consolidation are over-engineering or root-cause misses for \"first step.\""
+    },
+    {
+      "number": 3,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 1,
+      "text": "FCR is 55% (target 80%). Logs show it escalates straightforward cases while autonomously handling complex policy-exception cases. Most effective way to improve escalation **calibration**?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Add explicit escalation criteria with few-shot examples demonstrating when to escalate vs resolve."
+        },
+        {
+          "key": "B",
+          "text": "Have the agent self-report a confidence score (1–10); route below threshold to humans."
+        },
+        {
+          "key": "C",
+          "text": "Deploy a classifier trained on historical tickets to predict escalations."
+        },
+        {
+          "key": "D",
+          "text": "Sentiment analysis → auto-escalate when negative sentiment exceeds a threshold."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Explicit criteria + few-shot is the proportionate first response; B/C/D are unreliable/over-engineered."
+    },
+    {
+      "number": 4,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 1,
+      "text": "A customer immediately replies \"I want to speak to a human\" before any investigation. The issue is a routine return within policy. What should the agent do?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Investigate first since the issue is clearly within capability; escalate only if resolution fails."
+        },
+        {
+          "key": "B",
+          "text": "Acknowledge the request, but proceed to resolve because FCR is the priority."
+        },
+        {
+          "key": "C",
+          "text": "Escalate immediately to a human agent."
+        },
+        {
+          "key": "D",
+          "text": "Ask the customer to confirm three times before honoring the request."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Honor explicit human-agent request **immediately**; don't gate on FCR."
+    },
+    {
+      "number": 5,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 1,
+      "text": "`lookup_order` returns five customer matches for \"John Smith.\" What's correct behavior?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Select the most recent match by last-order date."
+        },
+        {
+          "key": "B",
+          "text": "Choose the account with the highest lifetime value."
+        },
+        {
+          "key": "C",
+          "text": "Ask the customer for additional identifiers to disambiguate."
+        },
+        {
+          "key": "D",
+          "text": "Process a partial refund on the first match and ask for clarification."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Ask for additional identifiers; heuristic selection is forbidden."
+    },
+    {
+      "number": 6,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Business policy: refunds above $500 must always go to a human. Production shows the agent occasionally processes >$500 refunds. Best fix?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Add stronger wording in the system prompt about the $500 limit."
+        },
+        {
+          "key": "B",
+          "text": "Implement a tool-call interception hook that blocks `process_refund` above $500 and redirects to `escalate_to_human`."
+        },
+        {
+          "key": "C",
+          "text": "Increase the model's reasoning across retry attempts."
+        },
+        {
+          "key": "D",
+          "text": "Add few-shot examples with $500 thresholds."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Programmatic hook = guarantee for the >$500 policy; prompt is probabilistic."
+    },
+    {
+      "number": 7,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Your agent must aggregate `get_customer`/`lookup_order` outputs from different MCP tools with inconsistent formats (Unix timestamps, ISO 8601, numeric codes). Where should normalization happen?",
+      "options": [
+        {
+          "key": "A",
+          "text": "In the system prompt instructing the agent to interpret formats."
+        },
+        {
+          "key": "B",
+          "text": "In a PostToolUse hook that normalizes tool results before the agent processes them."
+        },
+        {
+          "key": "C",
+          "text": "By rewriting each backend to return a single canonical format."
+        },
+        {
+          "key": "D",
+          "text": "By asking the model to detect format and convert during reasoning."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "PostToolUse hook normalizes before model sees results; deterministic across heterogeneous tools."
+    },
+    {
+      "number": 8,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "During escalation, the human agent lacks access to the conversation transcript. What must the handoff include?",
+      "options": [
+        {
+          "key": "A",
+          "text": "A link to the full transcript."
+        },
+        {
+          "key": "B",
+          "text": "Customer ID, root cause analysis, refund amount (if any), and recommended action."
+        },
+        {
+          "key": "C",
+          "text": "Only the customer's original message."
+        },
+        {
+          "key": "D",
+          "text": "The agent's full internal reasoning trace."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Self-contained handoff: ID + root cause + amount + recommended action."
+    },
+    {
+      "number": 9,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "A message: \"I want to return my last order, dispute a billing charge, and update my email.\" Best agent behavior?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Handle one at a time in the order received, ignoring the others until the first resolves."
+        },
+        {
+          "key": "B",
+          "text": "Decompose into distinct items; investigate each (often in parallel, shared context); synthesize a unified resolution."
+        },
+        {
+          "key": "C",
+          "text": "Route the entire message to `escalate_to_human` since it's multi-concern."
+        },
+        {
+          "key": "D",
+          "text": "Process only the return; ignore the rest as out of scope."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Decompose → investigate (parallel, shared) → synthesize unified resolution."
+    },
+    {
+      "number": 10,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "What `stop_reason` value causes the agentic loop to **continue**?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`end_turn`"
+        },
+        {
+          "key": "B",
+          "text": "`tool_use`"
+        },
+        {
+          "key": "C",
+          "text": "`max_tokens`"
+        },
+        {
+          "key": "D",
+          "text": "`stop_sequence`"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`tool_use` continues the loop."
+    },
+    {
+      "number": 11,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Which is an anti-pattern for controlling the agentic loop?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Inspecting `stop_reason` from the API response."
+        },
+        {
+          "key": "B",
+          "text": "Appending `tool_result` blocks to conversation history between iterations."
+        },
+        {
+          "key": "C",
+          "text": "Parsing the assistant's natural-language text for the word \"done\" to decide termination."
+        },
+        {
+          "key": "D",
+          "text": "Executing requested tools when `stop_reason == \"tool_use\"`."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Parsing NL text for \"done\" is an explicit anti-pattern."
+    },
+    {
+      "number": 12,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 2,
+      "text": "Which two are appropriate escalation triggers? (select exactly 2)",
+      "options": [
+        {
+          "key": "A",
+          "text": "The customer explicitly requests a human."
+        },
+        {
+          "key": "B",
+          "text": "The customer uses several exclamation marks."
+        },
+        {
+          "key": "C",
+          "text": "The agent cannot make meaningful progress after reasoning + tools."
+        },
+        {
+          "key": "D",
+          "text": "The case is routine and fully within policy."
+        }
+      ],
+      "answer": [
+        "A",
+        "C"
+      ],
+      "why": "Explicit human request and inability to progress are valid triggers. (B sentiment, D routine = wrong.)"
+    },
+    {
+      "number": 13,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Why is self-reported confidence score an unreliable escalation signal?",
+      "options": [
+        {
+          "key": "A",
+          "text": "It requires extra tokens."
+        },
+        {
+          "key": "B",
+          "text": "LLM self-confidence is poorly calibrated, especially on hard cases."
+        },
+        {
+          "key": "C",
+          "text": "It can't be implemented in the Agent SDK."
+        },
+        {
+          "key": "D",
+          "text": "Customers can see the score and get confused."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Self-confidence poorly calibrated, especially hard cases."
+    },
+    {
+      "number": 14,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Where must tool results be placed for the model to incorporate new information between iterations?",
+      "options": [
+        {
+          "key": "A",
+          "text": "In a separate external log only."
+        },
+        {
+          "key": "B",
+          "text": "Appended to conversation history as `tool_result` blocks (matched to `tool_use_id`)."
+        },
+        {
+          "key": "C",
+          "text": "Compressed into a summary string."
+        },
+        {
+          "key": "D",
+          "text": "Replaced into the system prompt."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Append `tool_result` to history matched to `tool_use_id`."
+    },
+    {
+      "number": 15,
+      "scenario": "Scenario A — Customer Support Resolution Agent (Q1–15)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Long sessions start giving inconsistent answers and citing \"typical patterns.\" What's the best remedy?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Use a larger context-window model."
+        },
+        {
+          "key": "B",
+          "text": "Maintain scratchpad files of key findings and reference them for subsequent questions."
+        },
+        {
+          "key": "C",
+          "text": "Re-summarize the entire history more aggressively."
+        },
+        {
+          "key": "D",
+          "text": "Restart the loop on each user message."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Scratchpad files counteract context degradation. (Bigger model/re-summarize = wrong.)"
+    },
+    {
+      "number": 16,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "For \"impact of AI on creative industries,\" only visual arts coverage; coordinator decomposed into digital art, graphic design, photography. Root cause?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Synthesis agent lacks gap-detection instructions."
+        },
+        {
+          "key": "B",
+          "text": "Coordinator's task decomposition is too narrow, omitting music/writing/film."
+        },
+        {
+          "key": "C",
+          "text": "Web search queries aren't comprehensive enough."
+        },
+        {
+          "key": "D",
+          "text": "Document analysis filtered out non-visual sources."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Coordinator's narrow decomposition; subagents worked correctly within scope."
+    },
+    {
+      "number": 17,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Web search subagent times out. Which error propagation best enables intelligent recovery?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Structured error context: failure type + attempted query + partial results + alternative approaches."
+        },
+        {
+          "key": "B",
+          "text": "Auto-retry with exponential backoff; return generic \"search unavailable\" after exhaustion."
+        },
+        {
+          "key": "C",
+          "text": "Catch timeout, return empty result set marked as successful."
+        },
+        {
+          "key": "D",
+          "text": "Propagate exception to a top-level handler that terminates the workflow."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Structured error context enables recovery."
+    },
+    {
+      "number": 18,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Synthesis needs fact-checks in 85% simple cases (dates/names) and 15% deep investigations; routing all via coordinator adds 40% latency. Best approach?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Give synthesis a scoped `verify_fact` tool for simple lookups; complex cases delegate via coordinator."
+        },
+        {
+          "key": "B",
+          "text": "Give synthesis all web search tools."
+        },
+        {
+          "key": "C",
+          "text": "Batch all verifications to end-of-pass."
+        },
+        {
+          "key": "D",
+          "text": "Have web search proactively cache context anticipating needs."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Scoped tool = principle of least privilege; preserve pattern for complex cases."
+    },
+    {
+      "number": 19,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "For the coordinator to spawn subagents, what must its config include?",
+      "options": [
+        {
+          "key": "A",
+          "text": "A \"coordinator\" role in the system prompt."
+        },
+        {
+          "key": "B",
+          "text": "`allowedTools` containing `\"Task\"`."
+        },
+        {
+          "key": "C",
+          "text": "An MCP resource catalog."
+        },
+        {
+          "key": "D",
+          "text": "fork_session enabled."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`Task` in `allowedTools` is required to spawn subagents."
+    },
+    {
+      "number": 20,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Do subagents inherit the coordinator's conversation history?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Yes, automatically."
+        },
+        {
+          "key": "B",
+          "text": "No — context is isolated; everything must be passed explicitly in the prompt."
+        },
+        {
+          "key": "C",
+          "text": "Only if `share_context: true`."
+        },
+        {
+          "key": "D",
+          "text": "Only for the first three turns."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Isolated context; explicit passing only."
+    },
+    {
+      "number": 21,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "To run subagents in parallel, the coordinator should:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Emit one Task call per turn across multiple turns."
+        },
+        {
+          "key": "B",
+          "text": "Emit multiple Task tool calls in a single coordinator response."
+        },
+        {
+          "key": "C",
+          "text": "Use a higher concurrency limit setting."
+        },
+        {
+          "key": "D",
+          "text": "Configure `parallel: true` per subagent."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Multiple Task calls in a single response."
+    },
+    {
+      "number": 22,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "How should the coordinator's prompt be structured for best subagent adaptability?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Step-by-step procedural instructions."
+        },
+        {
+          "key": "B",
+          "text": "Research goals + quality criteria."
+        },
+        {
+          "key": "C",
+          "text": "A rigid pipeline definition."
+        },
+        {
+          "key": "D",
+          "text": "Enumeration of every possible question."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Goals + quality criteria enable adaptability."
+    },
+    {
+      "number": 23,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Conflicting credible statistics appear in two sources. Synthesis should:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Pick the higher-value figure."
+        },
+        {
+          "key": "B",
+          "text": "Pick the more recent publication regardless of source quality."
+        },
+        {
+          "key": "C",
+          "text": "Include both values with explicit source attribution; mark as contested."
+        },
+        {
+          "key": "D",
+          "text": "Average them."
+        }
+      ],
+      "answer": [
+        "C"
+      ],
+      "why": "Annotate conflict with attribution; don't pick arbitrarily."
+    },
+    {
+      "number": 24,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Subagent outputs must include which for temporal correctness during synthesis?",
+      "options": [
+        {
+          "key": "A",
+          "text": "A model name."
+        },
+        {
+          "key": "B",
+          "text": "Publication/collection dates."
+        },
+        {
+          "key": "C",
+          "text": "A page count."
+        },
+        {
+          "key": "D",
+          "text": "Author email addresses."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Publication/collection dates prevent temporal differences being misread as contradictions."
+    },
+    {
+      "number": 25,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Synthesis should render content types how?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Convert everything to a uniform bullet list."
+        },
+        {
+          "key": "B",
+          "text": "Render appropriately: financial → tables, news → prose, technical → structured lists."
+        },
+        {
+          "key": "C",
+          "text": "Render everything as prose paragraphs."
+        },
+        {
+          "key": "D",
+          "text": "Render everything as JSON."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Render types appropriately; don't unify."
+    },
+    {
+      "number": 26,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "What should the synthesis pass include when some sources were unavailable?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Coverage annotations indicating well-supported vs gap areas."
+        },
+        {
+          "key": "B",
+          "text": "A note saying \"no gaps.\""
+        },
+        {
+          "key": "C",
+          "text": "Removal of the affected section silently."
+        },
+        {
+          "key": "D",
+          "text": "Estimation from training knowledge."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Coverage annotations flag well-supported vs gaps."
+    },
+    {
+      "number": 27,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Refinement loop in multi-agent research:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Coordinator evaluates synthesis for gaps; re-delegates targeted queries; re-invokes synthesis until coverage sufficient."
+        },
+        {
+          "key": "B",
+          "text": "Always run three independent synthesis passes and pick the best."
+        },
+        {
+          "key": "C",
+          "text": "Restart the entire pipeline from scratch on any gap."
+        },
+        {
+          "key": "D",
+          "text": "Skip gap evaluation to save latency."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Coordinator's iterative refinement on gaps."
+    },
+    {
+      "number": 28,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Why structure subagent outputs (separating content from metadata like URLs/page numbers)?",
+      "options": [
+        {
+          "key": "A",
+          "text": "To reduce token count only."
+        },
+        {
+          "key": "B",
+          "text": "To preserve attribution/source provenance when passing between agents."
+        },
+        {
+          "key": "C",
+          "text": "To make JSON parsing faster."
+        },
+        {
+          "key": "D",
+          "text": "To enforce a length limit."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Preserve attribution/provenance when passing between agents."
+    },
+    {
+      "number": 29,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D5",
+      "select": 1,
+      "text": "When downstream subagents have limited context budgets, what should upstream agents do?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Send full reasoning chains."
+        },
+        {
+          "key": "B",
+          "text": "Return structured data (key facts, citations, relevance scores) instead of verbose content."
+        },
+        {
+          "key": "C",
+          "text": "Append large appendices."
+        },
+        {
+          "key": "D",
+          "text": "Send only the most recent message."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Return structured data not verbose content for limited downstream budgets."
+    },
+    {
+      "number": 30,
+      "scenario": "Scenario B — Multi-Agent Research System (Q16–30)",
+      "domain": "D1",
+      "select": 1,
+      "text": "Best use of `fork_session` in research?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Resume a named prior session."
+        },
+        {
+          "key": "B",
+          "text": "Create parallel branches from a shared analysis baseline to explore divergent approaches."
+        },
+        {
+          "key": "C",
+          "text": "Compress context."
+        },
+        {
+          "key": "D",
+          "text": "Disable hooks."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`fork_session` = branches from shared baseline."
+    },
+    {
+      "number": 31,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "CI job: `claude \"Analyze this PR for security issues\"` hangs waiting for input. Correct approach?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`claude -p \"Analyze this PR for security issues\"`"
+        },
+        {
+          "key": "B",
+          "text": "Set `CLAUDE_HEADLESS=true`."
+        },
+        {
+          "key": "C",
+          "text": "`claude ... < /dev/null`"
+        },
+        {
+          "key": "D",
+          "text": "`claude --batch \"...\"`"
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "`-p` (`--print`) = non-interactive; others are non-existent."
+    },
+    {
+      "number": 32,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Manager proposes switching BOTH a blocking pre-merge check and an overnight debt report to Message Batches (50% off). How to evaluate?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Batch for the debt report only; real-time for the blocking pre-merge."
+        },
+        {
+          "key": "B",
+          "text": "Switch both to batch with status polling."
+        },
+        {
+          "key": "C",
+          "text": "Keep both real-time to avoid ordering issues."
+        },
+        {
+          "key": "D",
+          "text": "Switch both to batch with a real-time timeout fallback."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Batch for overnight (no SLA); sync for blocking pre-merge."
+    },
+    {
+      "number": 33,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "14-file PR produces inconsistent depth + contradictory feedback (flag a pattern in one file, approve identical code elsewhere). Restructure how?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Per-file local analysis pass + separate cross-file integration pass."
+        },
+        {
+          "key": "B",
+          "text": "Require devs to split PRs into 3–4 files."
+        },
+        {
+          "key": "C",
+          "text": "Use a higher-tier model with a bigger context window."
+        },
+        {
+          "key": "D",
+          "text": "Run 3 independent full-PR passes; flag issues in ≥2."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Per-file + integration passes fix attention dilution."
+    },
+    {
+      "number": 34,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Best mechanism for machine-parseable findings to post as inline PR comments?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`--output-format json` + `--json-schema`"
+        },
+        {
+          "key": "B",
+          "text": "Pipe stdout through grep"
+        },
+        {
+          "key": "C",
+          "text": "`-p --verbose`"
+        },
+        {
+          "key": "D",
+          "text": "`--markdown`"
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "`--output-format json` + `--json-schema` for structured CI output."
+    },
+    {
+      "number": 35,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Avoid duplicate review comments when re-running after new commits:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Reset all comments every run."
+        },
+        {
+          "key": "B",
+          "text": "Include prior findings in context; instruct Claude to report only new/unaddressed issues."
+        },
+        {
+          "key": "C",
+          "text": "Disable comments on rerun."
+        },
+        {
+          "key": "D",
+          "text": "Use a different model each time."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Include prior findings → only new/unaddressed."
+    },
+    {
+      "number": 36,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Generated tests duplicate existing test scenarios. Best fix?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Stop generating tests."
+        },
+        {
+          "key": "B",
+          "text": "Provide existing test files in context + document testing standards/fixtures in CLAUDE.md."
+        },
+        {
+          "key": "C",
+          "text": "Generate tests only for new files."
+        },
+        {
+          "key": "D",
+          "text": "Increase temperature."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Provide existing tests + standards/fixtures in CLAUDE.md."
+    },
+    {
+      "number": 37,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Review of generated code — best practice?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Same Claude session that generated the code reviews it."
+        },
+        {
+          "key": "B",
+          "text": "Use an independent Claude instance (no prior reasoning context)."
+        },
+        {
+          "key": "C",
+          "text": "Ask the generator to \"be extra careful.\""
+        },
+        {
+          "key": "D",
+          "text": "Add extended thinking to the same session."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Independent instance > self-review."
+    },
+    {
+      "number": 38,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Review FP rate is high in the \"documentation accuracy\" category, damaging trust. Proportionate first response?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Define explicit categorical criteria (\"flag only when claimed behavior contradicts actual code\") and improve prompts for that category."
+        },
+        {
+          "key": "B",
+          "text": "Replace the model."
+        },
+        {
+          "key": "C",
+          "text": "Add a confidence filter."
+        },
+        {
+          "key": "D",
+          "text": "Disable all categories."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Explicit criteria + improve prompts; proportionate response."
+    },
+    {
+      "number": 39,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "\"Be conservative; only report high-confidence findings\" — effective for precision?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Yes, always."
+        },
+        {
+          "key": "B",
+          "text": "No — specific categorical criteria outperform vague confidence-based filtering."
+        },
+        {
+          "key": "C",
+          "text": "Only with 10+ examples."
+        },
+        {
+          "key": "D",
+          "text": "Only for non-security findings."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Vague \"be conservative\" fails vs specific criteria."
+    },
+    {
+      "number": 40,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D3",
+      "select": 2,
+      "text": "Which CLAUDE.md CLI/context measures improve CI test-generation quality? (select exactly 2)",
+      "options": [
+        {
+          "key": "A",
+          "text": "Document testing standards, valuable criteria, and fixtures in CLAUDE.md."
+        },
+        {
+          "key": "B",
+          "text": "Provide existing test files in context."
+        },
+        {
+          "key": "C",
+          "text": "Increase model temperature."
+        },
+        {
+          "key": "D",
+          "text": "Disable all memory files."
+        }
+      ],
+      "answer": [
+        "A",
+        "B"
+      ],
+      "why": "Document standards in CLAUDE.md + provide existing tests. (C/D wrong.)"
+    },
+    {
+      "number": 41,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Message Batches API supports multi-turn tool calling within a single request?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Yes, fully."
+        },
+        {
+          "key": "B",
+          "text": "No — it does not support multi-turn tool calling mid-request."
+        },
+        {
+          "key": "C",
+          "text": "Only with MCP tools."
+        },
+        {
+          "key": "D",
+          "text": "Only if under 100 requests."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Batches: no multi-turn tool calling within a request."
+    },
+    {
+      "number": 42,
+      "scenario": "Scenario C — Claude Code for Continuous Integration (Q31–42)",
+      "domain": "D4",
+      "select": 1,
+      "text": "To guarantee overall SLA of 30 hours using Batches (≤24h processing), you should:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Submit batches at 4-hour intervals so a 24-hour batch still beats the 30-hour SLA."
+        },
+        {
+          "key": "B",
+          "text": "Submit one batch and hope it's fast."
+        },
+        {
+          "key": "C",
+          "text": "Never use batches."
+        },
+        {
+          "key": "D",
+          "text": "Use real-time API for all."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Cadence ensures 24h max batch fits in 30h SLA."
+    },
+    {
+      "number": 43,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Most reliable way to guarantee schema-compliant structured output?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Free-text JSON with \"output valid JSON only.\""
+        },
+        {
+          "key": "B",
+          "text": "`tool_use` with a JSON schema as input parameters."
+        },
+        {
+          "key": "C",
+          "text": "Asking the model to self-validate."
+        },
+        {
+          "key": "D",
+          "text": "Regex parsing of model text."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`tool_use` + JSON schema = most reliable."
+    },
+    {
+      "number": 44,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "`tool_choice` setting when document type is unknown and several extraction schemas exist?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`{\"type\":\"auto\"}`"
+        },
+        {
+          "key": "B",
+          "text": "`{\"type\":\"any\"}`"
+        },
+        {
+          "key": "C",
+          "text": "`{\"type\":\"none\"}`"
+        },
+        {
+          "key": "D",
+          "text": "`{\"type\":\"text\"}`"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`\"any\"` guarantees a tool call; choose which."
+    },
+    {
+      "number": 45,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "To force `extract_metadata` to run before enrichment tools:",
+      "options": [
+        {
+          "key": "A",
+          "text": "`tool_choice: {\"type\":\"tool\",\"name\":\"extract_metadata\"}`, then process in follow-up turns."
+        },
+        {
+          "key": "B",
+          "text": "Put `extract_metadata` first in the system prompt."
+        },
+        {
+          "key": "C",
+          "text": "Restrict `allowedTools` to `extract_metadata` only permanently."
+        },
+        {
+          "key": "D",
+          "text": "Add few-shot."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Forced tool_choice then follow-up turns."
+    },
+    {
+      "number": 46,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "A field may legitimately be absent from some source documents. Best schema design?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Make all fields required and instruct the model to guess."
+        },
+        {
+          "key": "B",
+          "text": "Make such fields optional/nullable so the model returns null rather than fabricating."
+        },
+        {
+          "key": "C",
+          "text": "Remove the field entirely."
+        },
+        {
+          "key": "D",
+          "text": "Always default to \"N/A\" string."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Optional/nullable prevents fabrication."
+    },
+    {
+      "number": 47,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Best pattern for an extensible categorical field?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Fixed enum with no fallback."
+        },
+        {
+          "key": "B",
+          "text": "Enum with \"other\" + a detail string (and \"unclear\" for ambiguous cases)."
+        },
+        {
+          "key": "C",
+          "text": "Free-text field."
+        },
+        {
+          "key": "D",
+          "text": "A second model pass."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Enum + \"other\" + detail; \"unclear\" for ambiguity."
+    },
+    {
+      "number": 48,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "Validation failed: line items don't sum to the stated total. Retry strategy?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Append the original document, the failed extraction, and the specific validation errors to the prompt and retry."
+        },
+        {
+          "key": "B",
+          "text": "Retry with no changes until it passes."
+        },
+        {
+          "key": "C",
+          "text": "Reduce the schema's required fields."
+        },
+        {
+          "key": "D",
+          "text": "Switch to free-text."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "Retry with original doc + failed extraction + specific errors."
+    },
+    {
+      "number": 49,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "When is retry-with-error-feedback **ineffective**?",
+      "options": [
+        {
+          "key": "A",
+          "text": "When the formatting mismatch is the issue."
+        },
+        {
+          "key": "B",
+          "text": "When the required information is simply absent from the source document."
+        },
+        {
+          "key": "C",
+          "text": "When the schema has optional fields."
+        },
+        {
+          "key": "D",
+          "text": "When the model is large."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Ineffective when info absent from source."
+    },
+    {
+      "number": 50,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D4",
+      "select": 1,
+      "text": "To catch semantic errors (sum mismatch, wrong field), best design?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Trust strict schema alone."
+        },
+        {
+          "key": "B",
+          "text": "Add computed cross-checks like `calculated_total` vs `stated_total`, `conflict_detected` booleans."
+        },
+        {
+          "key": "C",
+          "text": "Increase model temperature."
+        },
+        {
+          "key": "D",
+          "text": "Add more required fields."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Computed cross-checks catch semantic errors."
+    },
+    {
+      "number": 51,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Review a 100-doc batch result: aggregate accuracy is 97%, but you suspect weak segments. Best verification?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Trust the aggregate."
+        },
+        {
+          "key": "B",
+          "text": "Stratified random sampling; analyze accuracy by document type and field."
+        },
+        {
+          "key": "C",
+          "text": "Re-extract all 100."
+        },
+        {
+          "key": "D",
+          "text": "Lower the confidence threshold."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Stratified sampling + segment by type/field detects masked poor segments."
+    },
+    {
+      "number": 52,
+      "scenario": "Scenario D — Structured Data Extraction (Q43–52)",
+      "domain": "D5",
+      "select": 1,
+      "text": "Routing rule for human review (limited capacity):",
+      "options": [
+        {
+          "key": "A",
+          "text": "Review all extractions sequentially."
+        },
+        {
+          "key": "B",
+          "text": "Route low-confidence OR ambiguous/contradictory-source extractions to human review, prioritizing capacity."
+        },
+        {
+          "key": "C",
+          "text": "Skip review entirely if aggregate > 95%."
+        },
+        {
+          "key": "D",
+          "text": "Review only the first document."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Route low-confidence/ambiguous to humans, prioritizing capacity."
+    },
+    {
+      "number": 53,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "CLAUDE.md hierarchy from highest to lowest precedence:",
+      "options": [
+        {
+          "key": "A",
+          "text": "Directory → project → user."
+        },
+        {
+          "key": "B",
+          "text": "Enterprise managed → user (`~/.claude/`) → project (`./` or `.claude/`) → directory."
+        },
+        {
+          "key": "C",
+          "text": "Project → user → managed."
+        },
+        {
+          "key": "D",
+          "text": "User → enterprise → project."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Managed → user → project → directory."
+    },
+    {
+      "number": 54,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "A new team member doesn't receive coding conventions you wrote. Diagnosis?",
+      "options": [
+        {
+          "key": "A",
+          "text": "The conventions are in user-level config, not shared via version control — move to project-level."
+        },
+        {
+          "key": "B",
+          "text": "CLAUDE.md is project-only and breaks."
+        },
+        {
+          "key": "C",
+          "text": "They need a managed policy."
+        },
+        {
+          "key": "D",
+          "text": "Reset their `~/.claude`."
+        }
+      ],
+      "answer": [
+        "A"
+      ],
+      "why": "User-level not shared via VCS; move to project-level."
+    },
+    {
+      "number": 55,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "Best mechanism to enforce that test-file conventions apply to `*.test.tsx` files scattered across the repo?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Root CLAUDE.md with a \"Tests\" section."
+        },
+        {
+          "key": "B",
+          "text": "`.claude/rules/` file with `paths: [\"**/*.test.tsx\"]` glob frontmatter."
+        },
+        {
+          "key": "C",
+          "text": "A subdirectory CLAUDE.md per directory."
+        },
+        {
+          "key": "D",
+          "text": "A skill that loads on demand."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`.claude/rules/` with `paths:` globs handles scattered files."
+    },
+    {
+      "number": 56,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D3",
+      "select": 1,
+      "text": "You want a verbose codebase-analysis skill not to pollute the main conversation. Frontmatter?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`allowed-tools: read-only`"
+        },
+        {
+          "key": "B",
+          "text": "`context: fork`"
+        },
+        {
+          "key": "C",
+          "text": "`argument-hint: codebase`"
+        },
+        {
+          "key": "D",
+          "text": "`disable-model-invocation: true`"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "`context: fork` isolates skill output."
+    },
+    {
+      "number": 57,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Find all callers of `processRefund` across the codebase. Tool?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Glob"
+        },
+        {
+          "key": "B",
+          "text": "Grep"
+        },
+        {
+          "key": "C",
+          "text": "Bash `ls`"
+        },
+        {
+          "key": "D",
+          "text": "Write"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Grep = content search."
+    },
+    {
+      "number": 58,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D2",
+      "select": 1,
+      "text": "Find all test files anywhere in the repo. Tool?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Grep"
+        },
+        {
+          "key": "B",
+          "text": "Glob with `**/*.test.*`"
+        },
+        {
+          "key": "C",
+          "text": "Read"
+        },
+        {
+          "key": "D",
+          "text": "Edit"
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Glob = path search."
+    },
+    {
+      "number": 59,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "D2",
+      "select": 1,
+      "text": "You try to `Edit` a common string that appears 12 times. Correct fallback?",
+      "options": [
+        {
+          "key": "A",
+          "text": "Use Bash `sed`."
+        },
+        {
+          "key": "B",
+          "text": "Read the full file, then Write the modified content."
+        },
+        {
+          "key": "C",
+          "text": "Increase retries."
+        },
+        {
+          "key": "D",
+          "text": "Use Glob."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "Read + Write fallback for non-unique Edit."
+    },
+    {
+      "number": 60,
+      "scenario": "Domain knowledge items — all scenarios (Q53–60)",
+      "domain": "Misc",
+      "select": 1,
+      "text": "Which is OUT OF SCOPE for the exam (per the Exam Guide)?",
+      "options": [
+        {
+          "key": "A",
+          "text": "`tool_choice` semantics."
+        },
+        {
+          "key": "B",
+          "text": "Deploying/hosting MCP servers (container orchestration)."
+        },
+        {
+          "key": "C",
+          "text": "Few-shot examples."
+        },
+        {
+          "key": "D",
+          "text": "The CLAUDE.md hierarchy."
+        }
+      ],
+      "answer": [
+        "B"
+      ],
+      "why": "MCP hosting/containers explicitly out-of-scope."
+    }
+  ]
+}

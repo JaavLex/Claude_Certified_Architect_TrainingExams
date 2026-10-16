@@ -8,15 +8,53 @@ mod ui;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use std::time::Duration;
 
+const HELP: &str = "\
+exam-tui — timed CCAR-F practice exams in the terminal
+
+USAGE:
+    exam-tui [OPTIONS] [EXAM.json | FOLDER]...
+
+Loads the two built-in practice exams, every *.json exam in
+    {DIR}
+and any exam files or folders given as arguments.
+
+OPTIONS:
+    --check    Validate the exam files and exit
+    -h, --help Show this help
+";
+
 fn main() -> std::io::Result<()> {
-    let exams = match exam::load_all() {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("Failed to parse exam files: {e}");
-            std::process::exit(1);
+    let mut paths = Vec::new();
+    let mut check = false;
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "-h" | "--help" => {
+                print!("{}", HELP.replace("{DIR}", &exam::user_exam_dir().display().to_string()));
+                return Ok(());
+            }
+            "--check" => check = true,
+            _ => paths.push(std::path::PathBuf::from(arg)),
         }
-    };
-    let mut app = app::App::new(exams);
+    }
+    if check {
+        // Validate exam files without starting the UI.
+        let loaded = exam::load_all(&paths);
+        for e in &loaded.exams {
+            println!(
+                "ok     {} — {} ({} items, {} min) [{}]",
+                e.id,
+                e.title,
+                e.questions.len(),
+                e.time_limit_minutes,
+                e.source
+            );
+        }
+        for err in &loaded.errors {
+            println!("error  {err}");
+        }
+        std::process::exit(if loaded.errors.is_empty() { 0 } else { 1 });
+    }
+    let mut app = app::App::new(paths);
     let mut terminal = ratatui::init();
     let result = (|| -> std::io::Result<()> {
         while !app.quit {

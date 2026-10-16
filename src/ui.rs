@@ -1,8 +1,8 @@
 //! Rendering. Only the terminal's own 16-colour palette (named ANSI colours)
 //! and text modifiers are used, so the app follows the user's terminal theme.
 
-use crate::app::{App, MENU_ITEMS, Modal, ReviewFilter, Screen, Session};
-use crate::exam::{self, EXAM_ITEMS, EXAM_MINUTES, Exam, Question};
+use crate::app::{App, Modal, ReviewFilter, Screen, Session};
+use crate::exam::{Exam, Question};
 use crate::score::{self, CUT_SCORE, SCALE_MAX, SCALE_MIN};
 use crate::store::Attempt;
 use crate::text::{fmt_hms, md_spans, wrap};
@@ -57,7 +57,7 @@ fn ease(elapsed: Duration, dur: Duration) -> f64 {
 }
 
 fn short_title(e: &Exam) -> String {
-    e.title.split(" — ").next().unwrap_or(&e.title).to_string()
+    e.short_title()
 }
 
 fn fmt_date(ts: i64) -> String {
@@ -114,55 +114,77 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
         sub,
     );
 
+    let n = app.exams.len();
+    let menu_len = app.menu_len();
     let body = centered(body, 92, 15);
     let [left, right] = Layout::horizontal([Constraint::Length(34), Constraint::Fill(1)]).spacing(2).areas(body);
 
-    let labels = [
-        format!("{} ", short_title(&app.exams[0])),
-        format!("{} ", short_title(&app.exams[1])),
-        "Attempt history ".to_string(),
-        "Quit ".to_string(),
-    ];
-    let keys = ["1", "2", "h", "q"];
+    // Menu list: exams, a gap, history, quit. Scrolls if there are many exams.
+    let mut rows: Vec<Option<usize>> = (0..n).map(Some).collect();
+    rows.push(None);
+    rows.extend([Some(n), Some(n + 1)]);
+    let visible = left.height.saturating_sub(3) as usize;
+    let cur_row = rows.iter().position(|r| *r == Some(cursor)).unwrap_or(0);
+    let offset = cur_row.saturating_sub(visible.saturating_sub(1));
     let mut lines = vec![Line::raw("")];
-    for i in 0..MENU_ITEMS {
-        let sel = i == cursor;
-        let line = if sel {
-            Line::from(vec![
-                Span::styled(" ▌ ", Style::new().fg(ACCENT)),
-                Span::styled(labels[i].clone(), Style::new().fg(ACCENT).bold()),
-                Span::styled(format!(" {}", keys[i]), Style::new().fg(DIM)),
-            ])
-        } else {
-            Line::from(vec![
-                Span::raw("   "),
-                Span::raw(labels[i].clone()),
-                Span::styled(format!(" {}", keys[i]), Style::new().fg(DIM)),
-            ])
-        };
-        lines.push(line);
-        if i == 1 {
+    for item in rows.iter().skip(offset).take(visible) {
+        let Some(i) = *item else {
             lines.push(Line::raw(""));
-        }
+            continue;
+        };
+        let (label, key) = if i < n {
+            let e = &app.exams[i];
+            let tag = if e.is_builtin() { "" } else { " ✦" };
+            let key = if i < 9 { (i + 1).to_string() } else { String::new() };
+            (format!("{}{tag} ", e.short_title()), key)
+        } else if i == n {
+            ("Attempt history ".to_string(), "h".to_string())
+        } else {
+            ("Quit ".to_string(), "q".to_string())
+        };
+        let width = left.width.saturating_sub(10) as usize;
+        let label: String = if label.chars().count() > width {
+            label.chars().take(width.saturating_sub(1)).collect::<String>() + "… "
+        } else {
+            label
+        };
+        let sel = i == cursor;
+        lines.push(Line::from(vec![
+            Span::styled(if sel { " ▌ " } else { "   " }, Style::new().fg(ACCENT)),
+            Span::styled(label, if sel { Style::new().fg(ACCENT).bold() } else { Style::new() }),
+            Span::styled(format!(" {key}"), Style::new().fg(DIM)),
+        ]));
     }
     f.render_widget(Paragraph::new(lines).block(panel("Menu")), left);
 
     // Info panel for the highlighted item.
-    let info: Vec<Line> = if cursor < 2 {
+    let w = right.width.saturating_sub(4) as usize;
+    let info: Vec<Line> = if cursor < n {
         let e = &app.exams[cursor];
         let mine: Vec<&Attempt> = app.attempts.iter().filter(|a| a.exam_id == e.id).collect();
         let mut scen: Vec<String> = Vec::new();
         for q in &e.questions {
-            if scen.last() != Some(&q.scenario) {
+            if !q.scenario.is_empty() && !scen.contains(&q.scenario) {
                 scen.push(q.scenario.clone());
             }
         }
-        let w = right.width.saturating_sub(4) as usize;
         let mut v = vec![
-            Line::from(short_title(e)).bold(),
-            Line::from(format!("{EXAM_ITEMS} items · {EXAM_MINUTES} minutes · pass ≥ {CUT_SCORE} scaled")).fg(DIM),
-            Line::raw(""),
+            Line::from(e.short_title()).bold(),
+            Line::from(format!(
+                "{} items · {} minutes · pass ≥ {CUT_SCORE} scaled",
+                e.questions.len(),
+                e.time_limit_minutes
+            ))
+            .fg(DIM),
         ];
+        if !e.is_builtin() {
+            v.extend(wrap(
+                vec![Span::styled("✦ ", Style::new().fg(ACCENT))],
+                vec![Span::styled(e.source.clone(), Style::new().fg(DIM))],
+                w,
+            ));
+        }
+        v.push(Line::raw(""));
         if mine.is_empty() {
             v.push(Line::from("No attempts yet").fg(DIM).italic());
         } else {
@@ -181,26 +203,48 @@ fn draw_menu(f: &mut Frame, area: Rect, app: &App, cursor: usize) {
             ]));
         }
         v.push(Line::raw(""));
-        for s in scen.iter().take(4) {
+        if !e.description.is_empty() {
+            v.extend(wrap(vec![], md_spans(&e.description, Style::new()), w));
+            v.push(Line::raw(""));
+        }
+        for s in scen.iter().take(5) {
             v.extend(wrap(vec![Span::styled("• ", Style::new().fg(ACCENT))], vec![Span::raw(s.clone())], w));
         }
         v
-    } else if cursor == 2 {
-        let n = app.attempts.len();
+    } else if cursor == n {
+        let total = app.attempts.len();
         let passed = app.attempts.iter().filter(|a| a.report.passed).count();
         vec![
             Line::from("Review and compare previous attempts").bold(),
             Line::raw(""),
-            Line::from(format!("{n} attempt(s) recorded, {passed} passed")),
+            Line::from(format!("{total} attempt(s) recorded, {passed} passed")),
             Line::raw(""),
             Line::from(crate::store::path().display().to_string()).fg(DIM),
         ]
     } else {
         vec![Line::from("Exit the simulator").fg(DIM)]
     };
+    let _ = menu_len;
     f.render_widget(Paragraph::new(info).wrap(Wrap { trim: false }).block(panel("Details")), right);
 
-    f.render_widget(key_hint(&[("↑↓", "move"), ("enter", "select"), ("q", "quit")]), foot);
+    let mut hints = vec![("↑↓", "move"), ("enter", "select"), ("r", "reload exams"), ("q", "quit")];
+    if !app.load_errors.is_empty() {
+        hints.insert(2, ("e", "load errors"));
+        let [warn, keys] = Layout::vertical([Constraint::Length(1), Constraint::Length(1)])
+            .areas(Rect { y: foot.y.saturating_sub(1), height: 2, ..foot });
+        f.render_widget(
+            Paragraph::new(Line::from(format!(
+                "⚠ {} exam file(s) could not be loaded — press e for details",
+                app.load_errors.len()
+            )))
+            .fg(WARN)
+            .alignment(Alignment::Center),
+            warn,
+        );
+        f.render_widget(key_hint(&hints), keys);
+    } else {
+        f.render_widget(key_hint(&hints), foot);
+    }
 }
 
 // ───────────────────────────── Intro ─────────────────────────────
@@ -214,8 +258,8 @@ fn draw_intro(f: &mut Frame, area: Rect, app: &App, exam: usize) {
     let lines = vec![
         Line::from(e.title.clone()).bold().fg(ACCENT),
         Line::raw(""),
-        rule("Items", &format!("{EXAM_ITEMS} (multiple-choice and multiple-response)")),
-        rule("Time limit", &format!("{EXAM_MINUTES} minutes — auto-submits when time runs out")),
+        rule("Items", &format!("{} (multiple-choice and multiple-response)", e.questions.len())),
+        rule("Time limit", &format!("{} minutes — auto-submits when time runs out", e.time_limit_minutes)),
         rule("Passing", &format!("Scaled score ≥ {CUT_SCORE} on {SCALE_MIN}–{SCALE_MAX}")),
         rule("Multi-select", "Select EXACTLY the stated number; no partial credit"),
         rule("Unanswered", "Scored as incorrect — no penalty for guessing"),
@@ -336,7 +380,7 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
     lines.push(Line::raw(""));
 
     let mut cursor_line = (0, 0);
-    for (i, (letter, text)) in q.options.iter().enumerate() {
+    for (i, crate::exam::ExamOption { key: letter, text }) in q.options.iter().enumerate() {
         let picked = chosen.contains(letter);
         let at = i == s.cursor;
         let mark = match (q.select == 1, picked) {
@@ -378,7 +422,7 @@ fn draw_exam(f: &mut Frame, area: Rect, app: &App, s: &Session) {
     let hints: &[(&str, &str)] = if area.width >= 128 {
         &[
             ("↑↓", "option"),
-            ("spc/a-d", "select"),
+            ("spc/a-e/1-9", "select"),
             ("←→", "question"),
             ("f", "flag"),
             ("u", "unanswered"),
@@ -555,7 +599,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         Line::from(vec![Span::styled("Taken     ", Style::new().fg(DIM)), Span::raw(fmt_date(a.started_at))]),
         Line::from(vec![
             Span::styled("Time used ", Style::new().fg(DIM)),
-            Span::raw(format!("{} of {}:00:00", fmt_hms(a.duration_secs), EXAM_MINUTES / 60)),
+            Span::raw(format!("{} of {}", fmt_hms(a.duration_secs), fmt_hms(a.time_limit_secs))),
             if a.timed_out { Span::styled("  (time expired)", Style::new().fg(WARN)) } else { Span::raw("") },
         ]),
         Line::from(vec![
@@ -583,7 +627,7 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
     for d in r.domains.iter().filter(|d| d.total > 0) {
         let mut spans = vec![
             Span::styled(format!("{:<5}", d.domain), Style::new().fg(ACCENT).bold()),
-            Span::raw(format!("{:<40}", exam::domain_name(&d.domain))),
+            Span::raw(format!("{:<40}", truncate(&domain_name(app, a, &d.domain), 39))),
             Span::styled(format!("{:>2}/{:<2} ", d.correct, d.total), Style::new().fg(DIM)),
         ];
         spans.extend(mini_bar(d.pct() * t, bar_w));
@@ -620,6 +664,14 @@ fn draw_results(f: &mut Frame, area: Rect, app: &App, idx: usize, since: Duratio
         key_hint(&[("r", "review all"), ("w", "review incorrect"), ("h", "history"), ("enter", "back")]),
         foot,
     );
+}
+
+fn domain_name(app: &App, a: &Attempt, id: &str) -> String {
+    app.exam_index(&a.exam_id).map(|e| app.exams[e].domain_name(id)).unwrap_or_else(|| id.to_string())
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max { s.to_string() } else { s.chars().take(max - 1).collect::<String>() + "…" }
 }
 
 fn delta_span(d: f64, unit: &str) -> Span<'static> {
@@ -723,13 +775,13 @@ fn draw_review(
     ]));
     d.push(Line::from(vec![
         Span::styled(format!("{} ", q.domain), Style::new().fg(ACCENT)),
-        Span::styled(exam::domain_name(&q.primary_domain()).to_string(), Style::new().fg(DIM)),
+        Span::styled(e.domain_name(&q.primary_domain()), Style::new().fg(DIM)),
         Span::styled(format!("  ·  {}", short_scenario(&q.scenario)), Style::new().fg(DIM)),
     ]));
     d.push(Line::raw(""));
     d.extend(wrap(vec![], md_spans(&q.text, Style::new().bold()), w));
     d.push(Line::raw(""));
-    for (letter, text) in &q.options {
+    for crate::exam::ExamOption { key: letter, text } in &q.options {
         let right = q.answer.contains(letter);
         let picked = chosen.contains(letter);
         let (mark, st, tag) = match (right, picked) {
@@ -768,8 +820,8 @@ fn draw_review(
         let wrong: Vec<String> = chosen
             .iter()
             .filter(|c| !q.answer.contains(c))
-            .filter_map(|c| q.options.iter().find(|(l, _)| l == c))
-            .map(|(l, t)| format!("{l}. {t}"))
+            .filter_map(|c| q.options.iter().find(|o| o.key == *c))
+            .map(|o| format!("{}. {}", o.key, o.text))
             .collect();
         let missed: Vec<char> = q.answer.iter().copied().filter(|c| !chosen.contains(c)).collect();
         if !wrong.is_empty() {
@@ -964,6 +1016,13 @@ fn draw_history(f: &mut Frame, area: Rect, app: &App, cursor: usize, filter: Opt
 
 // ───────────────────────────── Modals ─────────────────────────────
 
+fn exam_len(app: &App) -> usize {
+    match &app.screen {
+        Screen::Exam(s) => app.exams[s.exam].questions.len(),
+        _ => 0,
+    }
+}
+
 fn draw_modal(f: &mut Frame, area: Rect, app: &App, m: &Modal) {
     let (title, body): (&str, Vec<Line>) = match m {
         Modal::ConfirmSubmit => {
@@ -1017,11 +1076,23 @@ fn draw_modal(f: &mut Frame, area: Rect, app: &App, m: &Modal) {
                 ]),
             ],
         ),
+        Modal::LoadErrors => {
+            let mut v = vec![
+                Line::from("These exam files were skipped:").bold(),
+                Line::raw(""),
+            ];
+            for err in &app.load_errors {
+                v.extend(wrap(vec![Span::styled("• ", Style::new().fg(WARN))], vec![Span::raw(err.clone())], 70));
+            }
+            v.push(Line::raw(""));
+            v.push(Line::from("Fix the file and press r on the menu to reload.").fg(DIM));
+            ("Load errors", v)
+        }
         Modal::Goto(buf) => (
             "Go to question",
             vec![
                 Line::from(vec![
-                    Span::raw(format!("Question number (1–{EXAM_ITEMS}): ")),
+                    Span::raw(format!("Question number (1–{}): ", exam_len(app))),
                     Span::styled(format!("{buf}▏"), Style::new().fg(ACCENT).bold()),
                 ]),
                 Line::raw(""),
@@ -1030,10 +1101,13 @@ fn draw_modal(f: &mut Frame, area: Rect, app: &App, m: &Modal) {
         ),
     };
     let h = body.len() as u16 + 4;
-    let r = centered(area, 58, h);
+    let wide = matches!(m, Modal::LoadErrors);
+    let r = centered(area, if wide { 80 } else { 58 }, h);
     f.render_widget(Clear, r);
     f.render_widget(
-        Paragraph::new(Text::from(body)).alignment(Alignment::Center).block(
+        Paragraph::new(Text::from(body))
+            .alignment(if wide { Alignment::Left } else { Alignment::Center })
+            .block(
             panel(title).border_style(Style::new().fg(ACCENT)).padding(Padding::uniform(1)),
         ),
         r,

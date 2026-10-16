@@ -93,6 +93,10 @@ pub fn wrap(prefix: Vec<Span<'static>>, spans: Vec<Span<'static>>, width: usize)
                 }
             } else {
                 word.push(c);
+                // Hard-break words too long to fit on a line of their own (e.g. paths).
+                if word.width() >= width - indent {
+                    flush_word(&mut word, &mut cur, &mut cur_w, &mut lines, &mut line_has_word);
+                }
             }
         }
         flush_word(&mut word, &mut cur, &mut cur_w, &mut lines, &mut line_has_word);

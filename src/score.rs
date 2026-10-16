@@ -53,9 +53,11 @@ pub fn scaled(correct: usize, total: usize) -> u32 {
 pub fn score(exam: &Exam, answers: &[Vec<char>]) -> ScoreReport {
     let mut correct = 0;
     let mut answered = 0;
-    let mut domains: Vec<DomainScore> = ["D1", "D2", "D3", "D4", "D5"]
+    // Domains in the order the exam file lists them; unlisted ones are appended.
+    let mut domains: Vec<DomainScore> = exam
+        .domains
         .iter()
-        .map(|d| DomainScore { domain: d.to_string(), correct: 0, total: 0 })
+        .map(|d| DomainScore { domain: d.id.clone(), correct: 0, total: 0 })
         .collect();
 
     for (i, q) in exam.questions.iter().enumerate() {
@@ -113,8 +115,7 @@ mod tests {
 
     #[test]
     fn multi_response_all_or_nothing() {
-        let exams = crate::exam::load_all().unwrap();
-        let e = &exams[0];
+        let e = &crate::exam::parse(include_str!("../exams/practice-exam-1.json"), "test").unwrap();
         let mut ans: Vec<Vec<char>> = e.questions.iter().map(|q| q.answer.clone()).collect();
         assert_eq!(score(e, &ans).correct, 60);
         ans[11] = vec!['A']; // Q12 needs A, C

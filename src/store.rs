@@ -11,9 +11,16 @@ pub struct Attempt {
     /// Unix seconds when the attempt started.
     pub started_at: i64,
     pub duration_secs: u64,
+    /// Time limit of the exam when it was taken (older records: 120 minutes).
+    #[serde(default = "default_limit")]
+    pub time_limit_secs: u64,
     pub timed_out: bool,
     pub answers: Vec<Vec<char>>,
     pub report: ScoreReport,
+}
+
+fn default_limit() -> u64 {
+    crate::exam::DEFAULT_MINUTES * 60
 }
 
 pub fn path() -> PathBuf {

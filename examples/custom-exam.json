@@ -1,0 +1,55 @@
+{
+  "$schema": "../schema/exam.schema.json",
+  "id": "example-mini",
+  "title": "Example Mini Exam — 3 questions, 5 minutes",
+  "description": "A short example showing the exam file format. Copy it, change the questions, and put it in your exam folder.",
+  "time_limit_minutes": 5,
+  "domains": [
+    { "id": "D1", "name": "Agentic Architecture & Orchestration" },
+    { "id": "D2", "name": "Tool Design & MCP Integration" }
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "scenario": "Scenario — Agentic loop basics",
+      "domain": "D1",
+      "select": 1,
+      "text": "Which `stop_reason` value means the agentic loop should **continue**?",
+      "options": [
+        { "key": "A", "text": "`end_turn`" },
+        { "key": "B", "text": "`tool_use`" },
+        { "key": "C", "text": "`max_tokens`" },
+        { "key": "D", "text": "`stop_sequence`" }
+      ],
+      "answer": ["B"],
+      "why": "`tool_use` means the model asked for a tool: run it, append the `tool_result`, and call the model again."
+    },
+    {
+      "number": 2,
+      "scenario": "Scenario — Agentic loop basics",
+      "domain": "D2",
+      "select": 2,
+      "text": "Which two built-in tools search the codebase? (select exactly 2)",
+      "options": [
+        { "key": "A", "text": "Grep, to search file contents" },
+        { "key": "B", "text": "Write" },
+        { "key": "C", "text": "Glob, to match file paths" },
+        { "key": "D", "text": "Edit" }
+      ],
+      "answer": ["A", "C"],
+      "why": "Grep searches contents and Glob matches paths. Write and Edit change files."
+    },
+    {
+      "number": 3,
+      "scenario": "Scenario — Agentic loop basics",
+      "domain": "D2/1",
+      "text": "`select` defaults to 1 when left out. Which option is correct?",
+      "options": [
+        { "key": "A", "text": "This one" },
+        { "key": "B", "text": "Not this one" }
+      ],
+      "answer": ["A"],
+      "why": "Questions without `select` are single-answer."
+    }
+  ]
+}

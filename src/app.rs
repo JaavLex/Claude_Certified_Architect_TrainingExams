@@ -1,15 +1,17 @@
 //! Application state and input handling.
 
-use crate::exam::{EXAM_MINUTES, Exam};
+use crate::exam::{self, Exam};
 use crate::score;
 use crate::store::{self, Attempt};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub struct Session {
     pub exam: usize,
     pub current: usize,
     pub cursor: usize,
+    pub limit: Duration,
     pub answers: Vec<Vec<char>>,
     pub flagged: Vec<bool>,
     pub started: Instant,
@@ -19,7 +21,7 @@ pub struct Session {
 
 impl Session {
     pub fn total(&self) -> Duration {
-        Duration::from_secs(EXAM_MINUTES * 60)
+        self.limit
     }
     pub fn elapsed(&self) -> Duration {
         self.started.elapsed().min(self.total())
@@ -73,6 +75,7 @@ pub enum Modal {
     ConfirmAbandon,
     ConfirmDelete,
     Goto(String),
+    LoadErrors,
 }
 
 pub struct App {
@@ -82,19 +85,39 @@ pub struct App {
     pub modal: Option<Modal>,
     pub quit: bool,
     pub save_error: Option<String>,
+    /// Exam files that failed to load, with reasons.
+    pub load_errors: Vec<String>,
+    /// Extra exam paths given on the command line (kept for reloading).
+    extra_paths: Vec<PathBuf>,
 }
 
-pub const MENU_ITEMS: usize = 4; // exam 1, exam 2, history, quit
-
 impl App {
-    pub fn new(exams: Vec<Exam>) -> Self {
+    pub fn new(extra_paths: Vec<PathBuf>) -> Self {
+        let loaded = exam::load_all(&extra_paths);
         App {
-            exams,
+            exams: loaded.exams,
             attempts: store::load(),
             screen: Screen::Menu { cursor: 0 },
             modal: None,
             quit: false,
             save_error: None,
+            load_errors: loaded.errors,
+            extra_paths,
+        }
+    }
+
+    /// Menu rows: one per exam, then history, then quit.
+    pub fn menu_len(&self) -> usize {
+        self.exams.len() + 2
+    }
+
+    /// Re-scan the exam folder and command-line paths.
+    fn reload(&mut self) {
+        let loaded = exam::load_all(&self.extra_paths);
+        self.exams = loaded.exams;
+        self.load_errors = loaded.errors;
+        if !self.load_errors.is_empty() {
+            self.modal = Some(Modal::LoadErrors);
         }
     }
 
@@ -152,6 +175,7 @@ impl App {
             exam_title: exam.title.clone(),
             started_at: s.started_unix,
             duration_secs: s.elapsed().as_secs(),
+            time_limit_secs: s.limit.as_secs(),
             timed_out,
             answers: s.answers.clone(),
             report,
@@ -196,17 +220,28 @@ impl App {
             self.on_modal_key(key);
             return;
         }
+        let n_exams = self.exams.len();
+        let menu_len = self.menu_len();
         match &mut self.screen {
             Screen::Menu { cursor } => match key.code {
-                KeyCode::Up | KeyCode::Char('k') => *cursor = (*cursor + MENU_ITEMS - 1) % MENU_ITEMS,
-                KeyCode::Down | KeyCode::Char('j') => *cursor = (*cursor + 1) % MENU_ITEMS,
-                KeyCode::Char('1') => self.screen = Screen::Intro { exam: 0 },
-                KeyCode::Char('2') => self.screen = Screen::Intro { exam: 1 },
+                KeyCode::Up | KeyCode::Char('k') => *cursor = (*cursor + menu_len - 1) % menu_len,
+                KeyCode::Down | KeyCode::Char('j') => *cursor = (*cursor + 1) % menu_len,
+                KeyCode::Char(c @ '1'..='9') => {
+                    let i = (c as u8 - b'1') as usize;
+                    if i < n_exams {
+                        self.screen = Screen::Intro { exam: i }
+                    }
+                }
                 KeyCode::Char('h') => self.screen = Screen::History { cursor: 0, filter: None },
+                KeyCode::Char('r') => {
+                    self.reload();
+                    self.screen = Screen::Menu { cursor: 0 };
+                }
+                KeyCode::Char('e') if !self.load_errors.is_empty() => self.modal = Some(Modal::LoadErrors),
                 KeyCode::Char('q') | KeyCode::Esc => self.quit = true,
                 KeyCode::Enter | KeyCode::Char(' ') => match *cursor {
-                    0 | 1 => self.screen = Screen::Intro { exam: *cursor },
-                    2 => self.screen = Screen::History { cursor: 0, filter: None },
+                    c if c < n_exams => self.screen = Screen::Intro { exam: c },
+                    c if c == n_exams => self.screen = Screen::History { cursor: 0, filter: None },
                     _ => self.quit = true,
                 },
                 _ => {}
@@ -214,10 +249,12 @@ impl App {
             Screen::Intro { exam } => match key.code {
                 KeyCode::Enter => {
                     let n = self.exams[*exam].questions.len();
+                    let limit = Duration::from_secs(self.exams[*exam].time_limit_secs());
                     self.screen = Screen::Exam(Session {
                         exam: *exam,
                         current: 0,
                         cursor: 0,
+                        limit,
                         answers: vec![Vec::new(); n],
                         flagged: vec![false; n],
                         started: Instant::now(),
@@ -275,7 +312,7 @@ impl App {
         let Some(modal) = &mut self.modal else { return };
         match modal {
             Modal::Goto(buf) => match key.code {
-                KeyCode::Char(c) if c.is_ascii_digit() && buf.len() < 2 => buf.push(c),
+                KeyCode::Char(c) if c.is_ascii_digit() && buf.len() < 3 => buf.push(c),
                 KeyCode::Backspace => {
                     buf.pop();
                 }
@@ -292,6 +329,7 @@ impl App {
                 KeyCode::Esc => self.modal = None,
                 _ => {}
             },
+            Modal::LoadErrors => self.modal = None,
             Modal::ConfirmSubmit => match key.code {
                 KeyCode::Char('y') | KeyCode::Enter => {
                     self.modal = None;
@@ -330,7 +368,7 @@ impl App {
         let last = s.answers.len() - 1;
 
         let toggle = |s: &mut Session, idx: usize| {
-            let Some(&(letter, _)) = q.options.get(idx) else { return };
+            let Some(letter) = q.options.get(idx).map(|o| o.key) else { return };
             s.cursor = idx;
             let ans = &mut s.answers[s.current];
             if let Some(p) = ans.iter().position(|&c| c == letter) {
@@ -355,9 +393,14 @@ impl App {
                 let c = s.cursor;
                 toggle(s, c)
             }
-            KeyCode::Char(c @ 'a'..='d') => toggle(s, (c as u8 - b'a') as usize),
-            KeyCode::Char(c @ 'A'..='D') => toggle(s, (c as u8 - b'A') as usize),
-            KeyCode::Char(c @ '1'..='4') => toggle(s, (c as u8 - b'1') as usize),
+            // a–e pick the option with that key; 1–9 pick by position.
+            KeyCode::Char(c @ ('a'..='e' | 'A'..='E')) => {
+                let key = c.to_ascii_uppercase();
+                if let Some(i) = q.options.iter().position(|o| o.key == key) {
+                    toggle(s, i)
+                }
+            }
+            KeyCode::Char(c @ '1'..='9') => toggle(s, (c as u8 - b'1') as usize),
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('n') | KeyCode::Tab => {
                 if s.current < last {
                     s.current += 1;
@@ -495,7 +538,9 @@ impl App {
                     self.modal = Some(Modal::ConfirmDelete);
                 }
             }
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => self.screen = Screen::Menu { cursor: 2 },
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {
+                self.screen = Screen::Menu { cursor: n_exams }
+            }
             _ => {}
         }
     }

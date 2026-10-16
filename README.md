@@ -7,6 +7,7 @@ Built in Rust with [ratatui](https://ratatui.rs). It uses only your terminal's o
 ## Features
 
 - **Two full practice exams.** Pick Practice Exam #1 or #2 from the menu. Each has 60 scenario-based questions.
+- **Custom exams.** Put a `.json` exam file in your exam folder, or pass it on the command line, and it appears in the menu. See [Custom exams](#custom-exams).
 - **Timer.** A progress bar shows the time remaining and drains as time passes. It turns yellow at 25% left, red in the last 10 minutes, and pulses in the last 5 minutes. The exam submits itself when time runs out.
 - **Exam-style answering.** Each question says how many answers to pick ("Select 1" or "Select 2"), and you have to pick exactly that many.
 - **Navigator.** A grid of all 60 questions shows which are answered, incomplete, flagged or unanswered. You can flag questions and jump to any number, or to the next unanswered or flagged one.
@@ -28,9 +29,11 @@ Scoring follows the CCAR-F Exam Guide, section 10, "How the Exam Is Scored":
 | Pass mark | 720 |
 | Report | Pass/fail, scaled score, and percent correct per domain (the domain figures do not affect pass/fail) |
 
-> **Note:** the official conversion from correct answers to the 100–1,000 scale is not published. This app uses a straight-line conversion, `scaled = 100 + 900 × correct / 60`, so passing takes **42 of 60 correct (70%)**.
+> **Note:** the official conversion from correct answers to the 100–1,000 scale is not published. This app uses a straight-line conversion, `scaled = 100 + 900 × correct / items`, so passing a 60-item exam takes **42 of 60 correct (70%)**.
 
-For the per-domain breakdown, a question tagged with two domains in the answer key (e.g. `D4/1`) counts under the first one.
+For the per-domain breakdown, a question tagged with two domains (e.g. `D4/1`) counts under the first one.
+
+Custom exams are scored with the same rules. Only the number of items and the time limit can differ.
 
 ## Install and run
 
@@ -49,6 +52,15 @@ cargo install --path .
 exam-tui
 ```
 
+Command-line options:
+
+```sh
+exam-tui                          # built-in exams + your exam folder
+exam-tui my-exam.json other/      # also load these files or folders
+exam-tui my-exam.json --check     # validate exam files and exit
+exam-tui --help
+```
+
 A terminal of at least 80×24 is recommended. At 96 columns or wider, the question navigator appears next to the question.
 
 ## Keys
@@ -56,11 +68,15 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 | Screen | Key | Action |
 |---|---|---|
 | Menu | `↑↓` / `j k`, `Enter` | Move, select |
-| | `1` / `2` | Start Exam #1 / #2 |
+| | `1`–`9` | Start that exam |
 | | `h` | Attempt history |
+| | `r` | Reload exam files |
+| | `e` | Show exam files that failed to load |
 | | `q` | Quit |
 | Exam | `↑↓` / `j k` | Move between options |
-| | `Space` / `Enter`, `a`–`d`, `1`–`4` | Select or deselect an option |
+| | `Space` / `Enter` | Select or deselect the highlighted option |
+| | `a`–`e` | Select the option with that letter |
+| | `1`–`9` | Select the option in that position |
 | | `←→` / `h l` / `Tab` | Previous / next question |
 | | `f` | Flag or unflag the question |
 | | `u` / `m` | Next unanswered / next flagged question |
@@ -79,33 +95,97 @@ A terminal of at least 80×24 is recommended. At 96 columns or wider, the questi
 
 ## Data
 
-Attempts are saved as JSON in your user data folder:
+Attempts are saved as JSON in your user data folder, next to the `exams/` folder for custom exams:
 
 - Linux: `~/.local/share/exam-tui/attempts.json`
 - macOS: `~/Library/Application Support/exam-tui/attempts.json`
 - Windows: `%APPDATA%\exam-tui\attempts.json`
 
-## Exam content
+## Custom exams
 
-The questions live in [`exams/`](exams/) as Markdown and are built into the program, so it runs without any other files. To change a question or explanation, edit the Markdown and rebuild.
+Exams are JSON files. The two built-in exams are in [`exams/`](exams/) and are built into the program. You can add your own without rebuilding.
 
-The app reads this format:
+### Where to put them
 
-```markdown
-## Scenario A — Some scenario
+The app loads every `*.json` file in your exam folder when it starts:
 
-**1. (Select 1)** Question text…
-- A. Option
-- B. Option
+- Linux: `~/.local/share/exam-tui/exams/`
+- macOS: `~/Library/Application Support/exam-tui/exams/`
+- Windows: `%APPDATA%\exam-tui\exams\`
 
-# ✅ ANSWER KEY — …
+You can also pass files or folders on the command line: `exam-tui path/to/exam.json`.
 
-| Q | Ans | Domain | Why |
-|---|-----|--------|-----|
-| 1 | **A** | D1 | Explanation… |
+Custom exams are marked with ✦ in the menu. Press `r` on the menu to reload after you add or edit a file. A file with the same `id` as another exam replaces it, so you can also override a built-in exam this way.
+
+### Format
+
+[`examples/custom-exam.json`](examples/custom-exam.json) is a complete 3-question example. The full format is in [`schema/exam.schema.json`](schema/exam.schema.json). Add `"$schema"` to your file to get autocomplete and checking in editors such as VS Code:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/JaavLex/Claude_Certified_Architect_TrainingExams/main/schema/exam.schema.json",
+  "id": "my-exam",
+  "title": "My Exam — optional subtitle",
+  "description": "Shown in the menu.",
+  "time_limit_minutes": 120,
+  "domains": [
+    { "id": "D1", "name": "Agentic Architecture & Orchestration" }
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "scenario": "Scenario A — Customer Support Agent",
+      "domain": "D1",
+      "select": 1,
+      "text": "Which `stop_reason` keeps the loop going?",
+      "options": [
+        { "key": "A", "text": "`end_turn`" },
+        { "key": "B", "text": "`tool_use`" }
+      ],
+      "answer": ["B"],
+      "why": "Explanation shown in the review screen."
+    }
+  ]
+}
 ```
 
-The program refuses to start if an exam doesn't have exactly 60 questions, or if an answer in the key doesn't match the number of choices the question asks for. Run `cargo test` to check both exams.
+**Exam fields**
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | Unique id. Attempt history is grouped by it, so keep it the same when you edit the exam. |
+| `title` | yes | Full title. The part before ` — ` is the short name used in menus. |
+| `description` | no | Text shown in the menu's Details panel. |
+| `time_limit_minutes` | no | Time limit. Default: 120. |
+| `domains` | no | `id`/`name` pairs for the per-domain breakdown, in display order. |
+| `questions` | yes | At least one question. |
+
+**Question fields**
+
+| Field | Required | Meaning |
+|---|---|---|
+| `number` | yes | Question number. Must be unique in the exam. |
+| `text` | yes | The question. |
+| `options` | yes | 2–9 options, each with a capital-letter `key` and `text`. |
+| `answer` | yes | Keys of the correct options, e.g. `["A", "C"]`. |
+| `select` | no | How many options to pick. Default: 1. Must equal the number of keys in `answer`. |
+| `scenario` | no | Heading shown above the question. |
+| `domain` | no | Domain id, e.g. `D1`. With `D4/1` the first id is used. |
+| `why` | no | Explanation shown in the review screen. |
+
+In question, option, description and explanation text, `` `code` `` and `**bold**` are formatted.
+
+### Checking a file
+
+The app checks every file when it loads. A file with mistakes is skipped and listed on the menu (press `e` to see why). To check files without starting the app:
+
+```sh
+exam-tui path/to/exam.json --check
+```
+
+It checks, for example, that `answer` has exactly `select` keys, that every answer is one of the option keys, and that question numbers and option keys are not repeated.
+
+Run `cargo test` to check the built-in exams. They must keep the official format of 60 items and 120 minutes.
 
 ## Project layout
 
@@ -114,11 +194,13 @@ src/
   main.rs   main loop and terminal setup
   app.rs    screens and key handling
   ui.rs     drawing each screen
-  exam.rs   reading the exam Markdown and answer key
+  exam.rs   loading and checking exam JSON files
   score.rs  scoring and pass/fail
   store.rs  saved attempt history
   text.rs   formatting and line wrapping
-exams/      practice exam files
+exams/      built-in practice exams (JSON)
+examples/   example custom exam
+schema/     JSON Schema for exam files
 ```
 
 ## Disclaimer

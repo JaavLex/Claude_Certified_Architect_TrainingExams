@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JaavLex/Claude_Certified_Architect_TrainingExams/schema/exam.schema.json",
+  "title": "exam-tui exam",
+  "description": "An exam for exam-tui. The app also checks rules a schema cannot express: \"answer\" must have exactly \"select\" keys, and every answer must be one of the question's option keys.",
+  "type": "object",
+  "required": ["id", "title", "questions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique id. Attempt history is grouped by it, so keep it the same when you edit the exam. A file with the same id as another exam replaces it."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full title. The part before \" — \" is used as the short name in menus."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional text shown in the menu's Details panel."
+    },
+    "time_limit_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 120,
+      "description": "Time limit. Defaults to 120 minutes, as in the CCAR-F Exam Guide."
+    },
+    "domains": {
+      "type": "array",
+      "description": "Domains for the per-domain score breakdown, in display order. A question's domain that is not listed here is shown by its id.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "examples": ["D1"] },
+          "name": { "type": "string", "examples": ["Agentic Architecture & Orchestration"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "$defs": {
+    "question": {
+      "type": "object",
+      "required": ["number", "text", "options", "answer"],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Question number shown to the user. Must be unique within the exam."
+        },
+        "scenario": {
+          "type": "string",
+          "description": "Scenario or section heading shown above the question."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Domain id, e.g. \"D1\". For several domains use \"D4/1\": the first one is used for scoring.",
+          "examples": ["D1", "D4/1"]
+        },
+        "select": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "How many options the user must pick. Must be fewer than the number of options."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Question text. Supports `code` and **bold**."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 9,
+          "items": {
+            "type": "object",
+            "required": ["key", "text"],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Z]$",
+                "description": "Capital letter for the option. Use unique keys, usually A, B, C, D in order."
+              },
+              "text": { "type": "string", "description": "Option text. Supports `code` and **bold**." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "answer": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z]$" },
+          "description": "Keys of the correct options. Must contain exactly \"select\" keys."
+        },
+        "why": {
+          "type": "string",
+          "description": "Explanation shown when reviewing the question."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
